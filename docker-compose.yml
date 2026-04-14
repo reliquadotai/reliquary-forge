@@ -1,0 +1,51 @@
+services:
+  miner:
+    build: .
+    container_name: reliquary-miner
+    env_file:
+      - .env
+    environment:
+      - RELIQUARY_DATA_DIR=/app/data
+    command: ["reliquary", "mine", "--window", "0"]
+    volumes:
+      - reliquary-data:/app/data
+    restart: "no"
+
+  validator:
+    build: .
+    container_name: reliquary-validator
+    env_file:
+      - .env
+    environment:
+      - RELIQUARY_DATA_DIR=/app/data
+    command: ["reliquary", "validate", "--window", "0"]
+    volumes:
+      - reliquary-data:/app/data
+    restart: "no"
+
+  trainer:
+    build: .
+    container_name: reliquary-trainer
+    env_file:
+      - .env
+    environment:
+      - RELIQUARY_DATA_DIR=/app/data
+    command: ["reliquary", "train", "--window", "0"]
+    volumes:
+      - reliquary-data:/app/data
+    restart: "no"
+
+  demo:
+    build: .
+    container_name: reliquary-demo
+    env_file:
+      - .env
+    environment:
+      - RELIQUARY_DATA_DIR=/app/data
+    command: ["reliquary", "demo", "showcase"]
+    volumes:
+      - reliquary-data:/app/data
+    restart: "no"
+
+volumes:
+  reliquary-data:

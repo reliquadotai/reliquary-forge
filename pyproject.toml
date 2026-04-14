@@ -1,0 +1,59 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "reliquary"
+version = "0.1.0"
+description = "Verified decentralized on-policy RL subnet scaffold"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "typer==0.16.1",
+    "rich==14.1.0",
+    "python-dotenv>=1.0.1",
+    "numpy>=1.26.0",
+    "pyarrow>=14.0.0",
+    "boto3>=1.34.0",
+    "bittensor==9.12.1",
+    "bittensor-wallet>=2.0.0",
+    "fastapi~=0.110.1",
+    "uvicorn>=0.34.0",
+    "redis>=5.0.0",
+    "psycopg[binary]>=3.2.0",
+]
+
+[project.optional-dependencies]
+ml = [
+    "transformers>=4.57.1",
+    "tokenizers>=0.22.1",
+    "datasets>=2.14.0",
+    "huggingface-hub>=0.20.0",
+    "safetensors>=0.4.0",
+]
+gpu = [
+    "torch>=2.9.0",
+    "accelerate>=1.10.0",
+    "peft>=0.17.0",
+    "trl>=0.20.0",
+    "vllm>=0.10.0",
+]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-xdist>=3.5.0",
+    "ruff>=0.12.0",
+]
+
+[project.scripts]
+reliquary = "reliquary.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["reliquary"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
