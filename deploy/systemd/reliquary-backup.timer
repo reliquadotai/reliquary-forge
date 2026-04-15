@@ -1,0 +1,10 @@
+[Unit]
+Description=Run daily Reliquary state backups
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+Unit=reliquary-backup.service
+
+[Install]
+WantedBy=timers.target

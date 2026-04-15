@@ -1,0 +1,36 @@
+name: gpu-deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/gpu-deploy.yml"
+      - "deploy/**"
+      - "docs/**"
+      - "reliquary/**"
+      - "README.md"
+      - "env.example"
+      - "pyproject.toml"
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, gpu, rtx6000b, reliquary]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sync repo to runtime path
+        run: |
+          mkdir -p /srv/reliquary/current
+          rsync -a --delete --exclude '.git' ./ /srv/reliquary/current/
+          chown -R reliquary:reliquary /srv/reliquary/current
+      - name: Install environments
+        run: /srv/reliquary/current/deploy/install-environments.sh
+      - name: Install systemd units
+        run: /srv/reliquary/current/deploy/install-systemd-units.sh
+      - name: Restart services
+        run: |
+          systemctl restart reliquary-vllm.service
+          systemctl restart reliquary-control-plane.service
+          systemctl restart reliquary-distill-worker.service
+      - name: Smoke checks
+        run: /srv/reliquary/current/deploy/smoke-distill.sh

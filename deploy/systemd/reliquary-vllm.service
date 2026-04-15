@@ -1,0 +1,16 @@
+[Unit]
+Description=Reliquary vLLM Teacher Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=reliquary
+WorkingDirectory=/srv/reliquary/current
+EnvironmentFile=/srv/reliquary/state/reliquary.env
+ExecStart=/bin/bash -lc 'exec /opt/miniforge/bin/conda run --no-capture-output -n reliquary-vllm python -m vllm.entrypoints.openai.api_server --host 127.0.0.1 --port 8001 --model "$RELIQUARY_VLLM_MODEL" --dtype bfloat16 --gpu-memory-utilization "${RELIQUARY_VLLM_GPU_MEMORY_UTILIZATION:-0.65}" --enforce-eager'
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,7 @@
+[Unit]
+Description=Reliquary State Backup
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/srv/reliquary/current/deploy/backup-state.sh

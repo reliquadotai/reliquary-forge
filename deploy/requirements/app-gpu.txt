@@ -1,0 +1,10 @@
+--extra-index-url https://download.pytorch.org/whl/cu130
+torch>=2.9.0
+transformers>=4.57.1
+tokenizers>=0.22.1
+datasets>=2.14.0
+huggingface-hub>=0.20.0
+safetensors>=0.4.0
+accelerate>=1.10.0
+peft>=0.17.0
+trl>=0.20.0

@@ -1,0 +1,16 @@
+[Unit]
+Description=Reliquary GitHub Actions Runner
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/srv/reliquary/state/actions-runner
+Environment=RUNNER_ALLOW_RUNASROOT=1
+ExecStart=/srv/reliquary/state/actions-runner/run.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
