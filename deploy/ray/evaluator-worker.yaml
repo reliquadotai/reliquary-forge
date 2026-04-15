@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: reliquary-evaluator-worker
+spec:
+  restartPolicy: Always
+  containers:
+    - name: evaluator-worker
+      image: python:3.12-slim
+      command: ["/bin/sh", "-lc"]
+      args:
+        - >
+          pip install "ray[default]>=2.20.0" "transformers>=4.57.1" &&
+          ray start --address=${RAY_HEAD_ADDRESS:-ray://reliquary-head:10001} &&
+          tail -f /dev/null

@@ -54,11 +54,38 @@ def _recent_scorecard_totals(registry, limit: int = 5) -> dict[str, float]:
     return totals
 
 
+def _latest_rl_training_batch(registry) -> dict[str, Any] | None:
+    batches = [
+        artifact
+        for artifact in registry.list_artifacts("training_batch")
+        if artifact.get("lane") == "rl"
+    ]
+    if not batches:
+        return None
+    return max(
+        batches,
+        key=lambda item: (int(item.get("window_id", -1)), str(item.get("created_at", ""))),
+    )
+
+
+def _decision_counts(registry) -> tuple[float, float]:
+    approvals = 0.0
+    rejections = 0.0
+    for artifact in registry.list_artifacts("policy_authority_decision"):
+        if bool(artifact.get("payload", {}).get("approved")):
+            approvals += 1.0
+        else:
+            rejections += 1.0
+    return approvals, rejections
+
+
 def build_metrics_text(cfg: dict[str, Any], registry) -> str:
     latest_policy = registry.latest_policy()
     latest_benchmark = _latest_artifact(registry, "benchmark_result")
     latest_decision = _latest_artifact(registry, "policy_authority_decision")
+    latest_rl_batch = _latest_rl_training_batch(registry)
     recent_totals = _recent_scorecard_totals(registry)
+    approvals, rejections = _decision_counts(registry)
 
     benchmark_delta = -1.0
     if latest_benchmark is not None:
@@ -86,9 +113,17 @@ def build_metrics_text(cfg: dict[str, Any], registry) -> str:
                 "node_label": str(cfg.get("node_label", "unknown")),
                 "service_version": str(cfg.get("service_version", "unknown")),
                 "artifact_backend": str(cfg.get("artifact_registry_backend", "unknown")),
+                "rl_backend": str(cfg.get("rl_learner_backend", "unknown")),
+                "ray_cluster_profile": str(cfg.get("ray_cluster_profile", "unknown")),
             },
         )
     )
+    latest_imported_window = -1.0
+    latest_queue_depth = 0.0
+    if latest_rl_batch is not None:
+        source_window_ids = latest_rl_batch.get("payload", {}).get("source_window_ids", [])
+        latest_imported_window = float(max(source_window_ids)) if source_window_ids else -1.0
+        latest_queue_depth = float(latest_rl_batch.get("payload", {}).get("training_eligible_count", 0))
     metrics = {
         "reliquary_latest_policy_window": (
             latest_policy_window,
@@ -121,6 +156,22 @@ def build_metrics_text(cfg: dict[str, Any], registry) -> str:
         "reliquary_recent_proof_failures": (
             recent_totals["proof_failures"],
             "Recent proof failures across scorecards.",
+        ),
+        "reliquary_latest_imported_source_window": (
+            latest_imported_window,
+            "Latest finalized inference window imported into the RL lane.",
+        ),
+        "reliquary_latest_rl_queue_depth": (
+            latest_queue_depth,
+            "Training-eligible trajectory count in the latest RL training batch.",
+        ),
+        "reliquary_checkpoint_approval_count": (
+            approvals,
+            "Approved checkpoint promotions recorded by policy authority.",
+        ),
+        "reliquary_checkpoint_rejection_count": (
+            rejections,
+            "Rejected checkpoint promotions recorded by policy authority.",
         ),
     }
     for name, (value, help_text) in metrics.items():

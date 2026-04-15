@@ -1,0 +1,21 @@
+apiVersion: ray.io/v1
+kind: RayCluster
+metadata:
+  name: reliquary-head
+spec:
+  rayVersion: "2.20.0"
+  headGroupSpec:
+    serviceType: ClusterIP
+    rayStartParams:
+      dashboard-host: "0.0.0.0"
+    template:
+      spec:
+        containers:
+          - name: ray-head
+            image: python:3.12-slim
+            command: ["/bin/sh", "-lc"]
+            args:
+              - >
+                pip install "ray[default]>=2.20.0" &&
+                ray start --head --port=6379 --ray-client-server-port=10001 --dashboard-host=0.0.0.0 &&
+                tail -f /dev/null

@@ -38,6 +38,9 @@ gpu = [
     "trl>=0.20.0",
     "vllm>=0.10.0",
 ]
+distributed = [
+    "ray[default]>=2.20.0",
+]
 dev = [
     "pytest>=8.0.0",
     "pytest-xdist>=3.5.0",

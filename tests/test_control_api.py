@@ -47,14 +47,24 @@ class _FakeRegistry:
             producer_role="benchmark_validator",
             policy_id="policy-1",
             window_id=4,
-            lane="distill",
+            lane="rl",
             payload={"holdout_metric": 0.125},
+        )
+        self._rl_batch = make_artifact(
+            artifact_type="training_batch",
+            producer_id="trainer",
+            producer_role="learner",
+            policy_id="policy-1",
+            window_id=4,
+            lane="rl",
+            payload={"source_window_ids": [6911280], "training_eligible_count": 3},
         )
         self._artifacts = {
             "policy": [self._policy],
             "scorecard": [self._scorecard],
             "policy_authority_decision": [self._decision],
             "benchmark_result": [self._benchmark],
+            "training_batch": [self._rl_batch],
         }
 
     def list_artifacts(self, artifact_type: str, window_id=None):
@@ -94,3 +104,5 @@ def test_metrics_endpoint_exports_platform_summary(monkeypatch) -> None:
     assert "reliquary_control_plane_up 1.0" in response.text
     assert "reliquary_latest_benchmark_delta 0.125" in response.text
     assert "reliquary_recent_accepted_traces 6.0" in response.text
+    assert "reliquary_latest_imported_source_window 6911280.0" in response.text
+    assert "reliquary_latest_rl_queue_depth 3.0" in response.text

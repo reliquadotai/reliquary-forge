@@ -1,6 +1,8 @@
 # GRPO Training Pipeline
 
-The trainer implements **Group Relative Policy Optimization (GRPO)** — a variant of PPO adapted for verified rollouts in a decentralized setting. The key insight: because rollouts carry proofs and rewards are validator-computed, the training data is trustworthy enough for on-policy updates.
+This document covers the local GRPO core that both the SAT demo path and the reasoning RL trainer quorum reuse.
+
+The trainer implements **Group Relative Policy Optimization (GRPO)** — a variant of PPO adapted for verified rollouts in a decentralized setting. The key insight: because rollouts carry proofs or finalized source lineage and rewards are validator-computed, the training data is trustworthy enough for on-policy updates.
 
 For the analytical argument on why this drives real learning, see [grpo_analysis.md](grpo_analysis.md).
 
@@ -13,6 +15,8 @@ Each training window:
 3. Run a clipped on-policy update with KL penalty.
 4. Evaluate the model before and after training.
 5. Save the checkpoint and publish the next policy.
+
+For the reasoning RL lane, accepted verdicts may be imported from finalized inference windows rather than generated from SAT challenges locally.
 
 ## Group Construction
 
@@ -36,8 +40,10 @@ Each group contains:
 
 ```json
 {
-  "challenge_id": "sat-42",
+  "challenge_id": "task-42",
   "prompt": "Solve this SAT problem...",
+  "env_id": "reasoning",
+  "task_source": "reasoning_tasks",
   "samples": [
     {
       "full_token_ids": [101, 205, ...],
@@ -48,7 +54,10 @@ Each group contains:
       "old_sum_logprob": -12.7,
       "reward": 0.88,
       "binary_score": 0.0,
-      "advantage": 1.42
+      "advantage": 1.42,
+      "task_metadata": {
+        "operation": "add"
+      }
     }
   ]
 }
@@ -151,6 +160,16 @@ This is a **sequence-level** metric (total log-likelihood), not token-level. The
 
 Evaluation runs **before and after** each training window to measure the delta. The eval seeds (10,000+) are distinct from training seeds (window * 10,000 + offset) to avoid contamination.
 
+For reasoning RL, the evaluator measures:
+
+- answer accuracy
+- accepted rate
+- format rate
+- policy compliance
+- contract score
+
+The promotion gate uses the benchmark artifact produced from those metrics rather than raw trainer output.
+
 ## Hyperparameters
 
 | Parameter | Env Variable | Default | Effect |
@@ -193,3 +212,11 @@ The trainer orchestrates each window via `train_window`:
 6. `publish_policy(model_ref=checkpoint_path, window_id=next)` — advance the loop.
 
 The checkpoint artifact preserves the full training provenance: which policy it derived from, what the training metrics were, and how the model improved.
+
+For reasoning RL imports, `train_window` also preserves:
+
+- source registry information
+- source window ids
+- reward contract
+- cluster profile
+- backend run spec metadata

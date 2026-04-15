@@ -3,12 +3,13 @@
 Reliquary is a verified subnet platform for decentralized post-training. It treats **verified experience** as the commodity:
 
 - **Distillation lane**: miners generate reasoning traces, validators verify provenance and quality, packers export deterministic datasets, and learners produce student checkpoints.
-- **RL lane**: miners generate proof-carrying rollouts, validators replay and score them, and learners turn accepted experience into policy updates.
+- **RL lane**: finalized reasoning trajectories are imported from the live inference runtime, grouped into RL batches, and trained by a benchmark-gated trainer quorum.
 
 This repo contains the broader platform surface:
 
 - verified distillation roadmap
-- verified RL roadmap
+- commodity-data ingestion from the live inference runtime
+- verified RL roadmap with trainer-quorum execution
 - learner and policy-authority architecture
 - control-plane and durable-node deployment work
 
@@ -49,7 +50,7 @@ flowchart TD
 - Explicit about artifacts and policy contracts
 - Dict-based, not Pydantic-based — inspectable and hashable
 - Environment-agnostic protocol (SAT is the first environment)
-- Dual-lane by design: reasoning-trace distillation first, async RL second
+- Dual-lane by design: reasoning-trace distillation plus benchmark-gated RL
 - Managed-infra-ready: local by default, R2/Postgres/Redis-ready by interface
 
 ## Stack
@@ -60,14 +61,17 @@ flowchart TD
 - Local filesystem artifact registry plus R2 and metadata-index interfaces
 - hidden-state sketch proofs over transformer activations
 - Reasoning-trace teacher backends with provenance signatures
-- Sequence-level clipped GRPO with backend abstraction for local and async learners
+- Sequence-level clipped GRPO with backend abstraction for local, dense, and MoE-ready learners
+- Ray-oriented trainer-quorum manifests for actor, learner, and evaluator workers
 - Optional `transformers` / `trl` / `peft` / `accelerate` / `vllm` extras for GPU-backed training and serving
+- Optional `ray` extra for multi-node trainer-quorum execution
 - Optional Bittensor chain adapter (`bittensor 9.12.1`)
 
 ## Environments
 
 - **sat**: miners solve generated k-SAT instances, submit rollouts with hidden-state sketch proofs, validators replay and score them, and the trainer turns accepted rollouts into GRPO-ready on-policy updates.
 - **reasoning**: miners generate reasoning traces, validators check provenance, format, correctness, contamination, and novelty, then packers export reusable distillation datasets.
+- **reasoning_rl**: finalized reasoning windows are imported through a live registry adapter and turned into RL-ready trajectories for dense or MoE-ready backends.
 - **showcase**: a deterministic local-first coordination flow that simulates multiple miner archetypes and exports a static audit dashboard.
 
 ## Repository Layout
@@ -85,13 +89,25 @@ reliquary/                Python package
   showcase/               RL + distillation demo orchestration and dashboards
   storage/                Local, R2, and metadata-indexed registries
   training/               GRPO and learner backends
+  inference_adapter.py    Live registry adapter for finalized inference windows
   utils/                  JSON I/O, model loading
   cli.py                  Typer CLI entry point
 docs/                     Technical documentation
+deploy/ray/               Trainer-quorum manifests
 tests/                    Unit tests
 Dockerfile                Container image definition
 docker-compose.yml        Local multi-service orchestration
 ```
+
+## Commodity Data and Trainer Quorum
+
+Reliquary treats finalized reasoning windows as an importable commodity surface for RL:
+
+- reasoning verdicts carry deterministic reward inputs such as final answer, correctness, policy compliance, format status, difficulty, and contamination overlap
+- the RL lane reads those finalized windows through an artifact-level registry adapter, not through shared Python internals
+- imported windows materialize as environment-agnostic trajectories, verdicts, and training batches with explicit lineage back to the source registry and window ids
+- dense RL uses a TRL/vLLM/FSDP2-oriented backend by default and emits Ray-oriented cluster manifests even in local-compatible execution mode
+- NeMo-oriented runs consume the same training-batch contract and emit compatible checkpoint and benchmark artifacts
 
 ## Setup
 
@@ -209,6 +225,12 @@ reliquary pack-distill [--window 0]
 reliquary train [--window 0]
     Run GRPO training on accepted verdicts, save checkpoint, publish next policy.
 
+reliquary import-inference-window [--window 0] [--source-window 6911280]
+    Import one finalized reasoning window from the inference registry into RL artifacts.
+
+reliquary run-rl-cycle [--window 0] [--source-window 6911280]
+    Run one off-chain reasoning RL cycle from imported inference data through checkpoint gating.
+
 reliquary distill-train [--window 0]
     Train the reasoning student backend from the latest distillation pack.
 
@@ -239,12 +261,12 @@ reliquary demo [showcase | recording | distill] [--windows N] [--challenges N] [
 
 ### RL lane
 
-1. Trainer publishes a SAT policy.
-2. Trainer emits SAT challenges.
-3. Miners create proof-carrying rollouts.
-4. Validator mesh verifies and scores them.
-5. Learner turns accepted rollouts into a new checkpoint.
-6. The next policy advances the window.
+1. Trainer publishes an RL policy describing the environment, reward contract, evaluator suite, and learner backend.
+2. Importer reads one or more finalized reasoning windows from the live inference registry.
+3. Imported trajectories materialize as RL rollouts and verdicts with explicit source lineage.
+4. Learner groups accepted trajectories into RL batches and trains a checkpoint through the configured backend.
+5. Evaluator measures benchmark deltas before and after training.
+6. Policy authority promotes the checkpoint only if the benchmark gate passes.
 
 ## SAT Environment
 
@@ -315,6 +337,7 @@ Tests cover SAT generation/evaluation, artifact protocol stability, reasoning-tr
 | [SAT Environment](docs/sat-environment.md) | Challenge generation, evaluation, difficulty scaling |
 | [Scoring](docs/scoring.md) | Uniqueness dedup, superlinear weighting, incentive mechanism |
 | [Training](docs/training.md) | GRPO training pipeline, clipped objective, KL penalty |
+| [Reasoning RL](docs/reasoning-rl.md) | Inference-window import, trainer quorum, dense and MoE-ready backend contracts |
 | [GRPO Analysis](docs/grpo_analysis.md) | Why verified dense reward drives real on-policy learning |
 | [Dual-Lane Decision Memo](docs/dual-lane-subnet-decision-memo.md) | Distillation + RL subnet strategy, stack decisions, artifact schemas, economics, roadmap |
 | [Distillation](docs/distillation.md) | Reasoning-trace lane, pack export, learner checkpoints, demo flow |

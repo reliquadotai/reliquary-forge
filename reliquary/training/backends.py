@@ -262,6 +262,7 @@ class LocalGRPOLearnerBackend:
         clip_eps: float,
         kl_coef: float,
         epochs: int,
+        **_: Any,
     ) -> dict[str, Any]:
         from ..training.grpo import train_grpo_checkpoint
 
@@ -277,15 +278,131 @@ class LocalGRPOLearnerBackend:
         )
 
 
-class AsyncGRPOBackend:
-    name = "trl_async_grpo"
+def _group_operations(groups: list[dict[str, Any]]) -> list[str]:
+    operations = {
+        str(sample.get("task_metadata", {}).get("operation"))
+        for group in groups
+        for sample in group.get("samples", [])
+        if sample.get("task_metadata", {}).get("operation")
+    }
+    return sorted(operations)
 
-    def train(self, **kwargs) -> dict[str, Any]:
-        return {
+
+def _cluster_profile(cfg: dict[str, Any]) -> dict[str, Any]:
+    endpoints = [
+        endpoint.strip()
+        for endpoint in str(cfg.get("rl_vllm_actor_endpoints", "")).split(",")
+        if endpoint.strip()
+    ]
+    return {
+        "control_plane": "ray",
+        "ray_head_address": str(cfg.get("ray_head_address", "local")),
+        "actor_replicas": int(cfg.get("ray_actor_replicas", 1)),
+        "learner_replicas": int(cfg.get("ray_learner_replicas", 1)),
+        "evaluator_replicas": int(cfg.get("ray_evaluator_replicas", 1)),
+        "actor_endpoints": endpoints,
+    }
+
+
+def _write_backend_bundle(output_dir: Path, spec_name: str, payload: dict[str, Any]) -> Path:
+    path = output_dir / spec_name
+    write_json(path, payload)
+    return path
+
+
+def _simulate_reasoning_checkpoint(output_dir: Path, groups: list[dict[str, Any]]) -> None:
+    operations = _group_operations(groups)
+    write_json(
+        output_dir / "reasoning_capabilities.json",
+        {
+            "supported_operations": operations,
+            "record_count": sum(len(group.get("samples", [])) for group in groups),
+        },
+    )
+
+
+class TRLAsyncGRPOFSDP2Backend:
+    name = "trl_async_grpo_fsdp2"
+
+    def train(
+        self,
+        *,
+        model_ref: str,
+        groups: list[dict[str, Any]],
+        output_dir: Path,
+        device: str,
+        cfg: dict[str, Any],
+        policy_artifact: dict[str, Any] | None = None,
+        training_batch_artifact: dict[str, Any] | None = None,
+        lr: float | None = None,
+        clip_eps: float | None = None,
+        kl_coef: float | None = None,
+        epochs: int | None = None,
+    ) -> dict[str, Any]:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        execution_mode = str(cfg.get("rl_backend_execution_mode", "simulate"))
+        cluster_profile = _cluster_profile(cfg)
+        run_spec = {
             "backend": self.name,
-            "status": "planned",
-            "detail": "External TRL AsyncGRPO execution must be configured with vLLM before use.",
+            "execution_mode": execution_mode,
+            "model_family": str(cfg.get("rl_model_family", "qwen-dense")),
+            "actor_model_ref": policy_artifact["payload"].get("actor_model_ref", model_ref) if policy_artifact else model_ref,
+            "reference_model_ref": policy_artifact["payload"].get("reference_model_ref", model_ref) if policy_artifact else model_ref,
+            "group_count": len(groups),
+            "sample_count": sum(len(group.get("samples", [])) for group in groups),
+            "cluster_profile": cluster_profile,
+            "learner": {
+                "optimizer": "adamw",
+                "lr": float(lr if lr is not None else cfg.get("train_lr", 1e-5)),
+                "clip_eps": float(clip_eps if clip_eps is not None else cfg.get("clip_eps", 0.2)),
+                "kl_coef": float(kl_coef if kl_coef is not None else cfg.get("kl_coef", 0.0)),
+                "epochs": int(epochs if epochs is not None else cfg.get("train_epochs", 1)),
+                "fsdp2": True,
+            },
+            "training_batch_id": training_batch_artifact["artifact_id"] if training_batch_artifact else None,
         }
+        _write_backend_bundle(output_dir, "trl_async_grpo_fsdp2.run.json", run_spec)
+        _write_backend_bundle(output_dir, "ray_cluster.json", cluster_profile)
+        _write_backend_bundle(
+            output_dir,
+            "actor_pool.json",
+            {
+                "serving_backend": "vllm",
+                "actor_endpoints": cluster_profile["actor_endpoints"],
+                "actor_replicas": cluster_profile["actor_replicas"],
+            },
+        )
+        if execution_mode == "local_compat":
+            summary = train_grpo_checkpoint(
+                model_ref=model_ref,
+                groups=groups,
+                output_dir=output_dir,
+                device=device,
+                lr=float(lr if lr is not None else cfg.get("train_lr", 1e-5)),
+                clip_eps=float(clip_eps if clip_eps is not None else cfg.get("clip_eps", 0.2)),
+                kl_coef=float(kl_coef if kl_coef is not None else cfg.get("kl_coef", 0.0)),
+                epochs=int(epochs if epochs is not None else cfg.get("train_epochs", 1)),
+            )
+        else:
+            _simulate_reasoning_checkpoint(output_dir, groups)
+            summary = {
+                "accepted_samples": sum(len(group.get("samples", [])) for group in groups),
+                "groups": len(groups),
+                "mean_loss": 0.0,
+                "steps": 0,
+                "status": "simulated",
+            }
+            write_json(output_dir / "training_summary.json", summary)
+        summary.update(
+            {
+                "backend": self.name,
+                "execution_mode": execution_mode,
+                "cluster_profile": cluster_profile,
+                "checkpoint_path": str(output_dir),
+                "run_spec_path": str(output_dir / "trl_async_grpo_fsdp2.run.json"),
+            }
+        )
+        return summary
 
 
 class TransformersSFTLearnerBackend:
@@ -494,15 +611,52 @@ class TransformersSFTLearnerBackend:
         }
 
 
-class NeMoLearnerBackend:
+class NeMoRLBackend:
     name = "nemo_rl"
 
-    def train(self, **kwargs) -> dict[str, Any]:
-        return {
+    def train(
+        self,
+        *,
+        model_ref: str,
+        groups: list[dict[str, Any]],
+        output_dir: Path,
+        device: str,
+        cfg: dict[str, Any],
+        policy_artifact: dict[str, Any] | None = None,
+        training_batch_artifact: dict[str, Any] | None = None,
+        **_: Any,
+    ) -> dict[str, Any]:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        execution_mode = str(cfg.get("nemo_execution_mode", cfg.get("rl_backend_execution_mode", "simulate")))
+        cluster_profile = _cluster_profile(cfg)
+        nemo_spec = {
             "backend": self.name,
-            "status": "planned",
-            "detail": "NeMo RL backend is reserved for multi-node frontier integration milestones.",
+            "execution_mode": execution_mode,
+            "cluster_profile": cluster_profile,
+            "model_family": str(cfg.get("rl_model_family", "qwen-moe-ready")),
+            "actor_model_ref": policy_artifact["payload"].get("actor_model_ref", model_ref) if policy_artifact else model_ref,
+            "reference_model_ref": policy_artifact["payload"].get("reference_model_ref", model_ref) if policy_artifact else model_ref,
+            "training_batch_id": training_batch_artifact["artifact_id"] if training_batch_artifact else None,
+            "sample_count": sum(len(group.get("samples", [])) for group in groups),
+            "group_count": len(groups),
+            "checkpoint_layout": "sharded",
+            "moe_ready": True,
         }
+        _write_backend_bundle(output_dir, "nemo_rl.run.json", nemo_spec)
+        _write_backend_bundle(output_dir, "ray_cluster.json", cluster_profile)
+        _simulate_reasoning_checkpoint(output_dir, groups)
+        summary = {
+            "backend": self.name,
+            "execution_mode": execution_mode,
+            "status": "simulated",
+            "accepted_samples": sum(len(group.get("samples", [])) for group in groups),
+            "groups": len(groups),
+            "checkpoint_path": str(output_dir),
+            "run_spec_path": str(output_dir / "nemo_rl.run.json"),
+            "cluster_profile": cluster_profile,
+        }
+        write_json(output_dir / "training_summary.json", summary)
+        return summary
 
 
 def build_distill_learner_backend(name: str):
@@ -514,8 +668,8 @@ def build_distill_learner_backend(name: str):
 
 
 def build_rl_learner_backend(name: str):
-    if name == "trl_async_grpo":
-        return AsyncGRPOBackend()
+    if name in {"trl_async_grpo", "trl_async_grpo_fsdp2"}:
+        return TRLAsyncGRPOFSDP2Backend()
     if name == "nemo_rl":
-        return NeMoLearnerBackend()
+        return NeMoRLBackend()
     return LocalGRPOLearnerBackend()

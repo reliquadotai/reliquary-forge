@@ -11,7 +11,13 @@ from .roles.packer import build_distill_pack
 from .roles.policy_authority import publish_distill_policy
 from .roles.tasking import generate_reasoning_task_batch_artifact
 from .roles.miner import mine_window
-from .roles.trainer import generate_challenge_artifacts, publish_policy, train_window
+from .roles.trainer import (
+    generate_challenge_artifacts,
+    import_inference_window,
+    publish_policy,
+    run_reasoning_rl_cycle,
+    train_window,
+)
 from .roles.validator import validate_distill_window, validate_window
 from .shared.bootstrap import bootstrap_runtime
 from .showcase.orchestrator import run_showcase
@@ -94,6 +100,51 @@ def train_cmd(window: int = 0) -> None:
         "Trained window "
         f"{window}: before={summary['eval_before']['mean_dense_reward']:.3f} "
         f"after={summary['eval_after']['mean_dense_reward']:.3f}"
+    )
+
+
+@app.command("import-inference-window")
+def import_inference_window_cmd(window: int = 0, source_window: int | None = None) -> None:
+    cfg, registry = bootstrap_runtime()
+    policy = registry.latest_policy()
+    if policy is None:
+        policy = publish_policy(
+            cfg,
+            window_id=window,
+            env_id="reasoning",
+            task_source=str(cfg.get("rl_task_source", "reasoning_tasks")),
+        )
+        registry.put_artifact(policy)
+    summary = import_inference_window(
+        registry,
+        cfg,
+        policy,
+        source_window_id=source_window,
+        target_window_id=window,
+    )
+    typer.echo(
+        f"Imported inference window into RL window {window}: "
+        f"{len(summary['verdict_artifacts'])} trajectories"
+    )
+
+
+@app.command("run-rl-cycle")
+def run_rl_cycle_cmd(window: int = 0, source_window: int | None = None) -> None:
+    cfg, registry = bootstrap_runtime()
+    result = run_reasoning_rl_cycle(
+        registry,
+        cfg,
+        source_window_id=source_window,
+        window_id=window,
+    )
+    training = result["training_summary"]
+    metric_before = training["eval_before"].get("contract_score", training["eval_before"].get("mean_dense_reward", 0.0))
+    metric_after = training["eval_after"].get("contract_score", training["eval_after"].get("mean_dense_reward", 0.0))
+    typer.echo(
+        "RL cycle complete: "
+        f"before={metric_before:.3f} "
+        f"after={metric_after:.3f} "
+        f"approved={training['decision_artifact']['payload']['approved']}"
     )
 
 

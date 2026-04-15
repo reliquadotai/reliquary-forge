@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: reliquary-learner-worker
+spec:
+  restartPolicy: Always
+  containers:
+    - name: learner-worker
+      image: python:3.12-slim
+      command: ["/bin/sh", "-lc"]
+      args:
+        - >
+          pip install "ray[default]>=2.20.0" "torch>=2.9.0" "trl>=0.20.0" "accelerate>=1.10.0" &&
+          ray start --address=${RAY_HEAD_ADDRESS:-ray://reliquary-head:10001} &&
+          tail -f /dev/null

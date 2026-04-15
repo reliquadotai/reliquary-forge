@@ -4,8 +4,6 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
-import torch
-
 from ..utils.json_io import write_json
 from ..utils.modeling import load_model_bundle, save_model_bundle
 
@@ -15,7 +13,12 @@ def build_grpo_groups(verdicts: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for verdict in verdicts:
         if not verdict["payload"].get("training_eligible", verdict["payload"]["accepted"]):
             continue
-        by_challenge.setdefault(verdict["payload"]["challenge_id"], []).append(verdict)
+        challenge_id = str(
+            verdict["payload"].get("challenge_id")
+            or verdict["payload"].get("task_id")
+            or verdict["artifact_id"]
+        )
+        by_challenge.setdefault(challenge_id, []).append(verdict)
 
     groups: list[dict[str, Any]] = []
     for challenge_id, items in by_challenge.items():
@@ -29,7 +32,9 @@ def build_grpo_groups(verdicts: list[dict[str, Any]]) -> list[dict[str, Any]]:
         groups.append(
             {
                 "challenge_id": challenge_id,
-                "prompt": items[0]["payload"]["challenge"]["prompt"],
+                "prompt": items[0]["payload"].get("challenge", {}).get("prompt", ""),
+                "env_id": items[0]["payload"].get("env_id", "sat"),
+                "task_source": items[0]["payload"].get("task_source"),
                 "samples": [
                     {
                         "full_token_ids": item["payload"]["generation"]["sequence_token_ids"],
@@ -41,6 +46,8 @@ def build_grpo_groups(verdicts: list[dict[str, Any]]) -> list[dict[str, Any]]:
                         "reward": float(item["payload"]["dense_reward"]),
                         "binary_score": float(item["payload"]["score"]),
                         "advantage": float(advantages[idx]),
+                        "task_metadata": item["payload"].get("challenge", {}).get("task", {}),
+                        "source_window_id": item["payload"].get("source_window_id"),
                     }
                     for idx, item in enumerate(items)
                 ],
@@ -49,7 +56,9 @@ def build_grpo_groups(verdicts: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return groups
 
 
-def _sequence_logprob(model, full_token_ids: list[int], prompt_len: int, device: str) -> torch.Tensor:
+def _sequence_logprob(model, full_token_ids: list[int], prompt_len: int, device: str):
+    import torch
+
     input_ids = torch.tensor(full_token_ids, dtype=torch.long, device=device).unsqueeze(0)
     logits = model(input_ids).logits[0]
     log_probs = torch.log_softmax(logits[:-1], dim=-1)
@@ -70,6 +79,8 @@ def train_grpo_checkpoint(
     kl_coef: float,
     epochs: int,
 ) -> dict[str, Any]:
+    import torch
+
     train_bundle = load_model_bundle(model_ref, device=device, trainable=True)
     ref_bundle = load_model_bundle(model_ref, device=device, trainable=False)
     model = train_bundle["model"]
