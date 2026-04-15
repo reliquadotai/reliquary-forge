@@ -18,6 +18,7 @@ Default bind settings come from:
 | Endpoint | Purpose |
 |----------|---------|
 | `GET /healthz` | Liveness check |
+| `GET /metrics` | Prometheus scrape endpoint for platform health and recent distillation metrics |
 | `GET /artifacts/{artifact_type}` | List artifacts by type, optionally filtered by `window_id` |
 | `GET /artifacts/{artifact_type}/{artifact_id}` | Fetch a single artifact |
 | `GET /policies/latest` | Return the latest published policy |
@@ -36,3 +37,5 @@ The control plane is not the chain. Its job is to:
 On-chain publication still belongs to the Bittensor adapter layer.
 
 For the first RTX6000B deployment the control plane remains localhost-only and is intended to be reached through SSH tunneling, not a public port exposure.
+
+When the control plane is running on the same host as the inference node, Prometheus can scrape `GET /metrics` and feed the shared Grafana dashboards without adding a second monitoring stack.

@@ -3,7 +3,9 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import PlainTextResponse
 
+from ..observability import build_metrics_text
 from ..roles.policy_authority import make_policy_authority_decision, promote_checkpoint_to_policy, publish_distill_policy
 from ..shared.bootstrap import bootstrap_runtime
 
@@ -13,6 +15,15 @@ app = FastAPI(title="Reliquary Control Plane", version="0.2.0")
 @app.get("/healthz")
 def healthz() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/metrics", response_class=PlainTextResponse)
+def metrics() -> PlainTextResponse:
+    cfg, registry = bootstrap_runtime()
+    return PlainTextResponse(
+        content=build_metrics_text(cfg, registry),
+        media_type="text/plain; version=0.0.4; charset=utf-8",
+    )
 
 
 @app.get("/artifacts/{artifact_type}")

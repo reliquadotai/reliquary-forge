@@ -318,6 +318,6 @@ Tests cover SAT generation/evaluation, artifact protocol stability, reasoning-tr
 | [GRPO Analysis](docs/grpo_analysis.md) | Why verified dense reward drives real on-policy learning |
 | [Dual-Lane Decision Memo](docs/dual-lane-subnet-decision-memo.md) | Distillation + RL subnet strategy, stack decisions, artifact schemas, economics, roadmap |
 | [Distillation](docs/distillation.md) | Reasoning-trace lane, pack export, learner checkpoints, demo flow |
-| [Control Plane](docs/control-plane.md) | FastAPI endpoints, policy publication, promotion flow |
+| [Control Plane](docs/control-plane.md) | FastAPI endpoints, policy publication, promotion flow, Prometheus metrics |
 | [Showcase](docs/showcase.md) | PoC walkthrough, miner archetypes, dashboard output |
 | [Configuration](docs/configuration.md) | All env vars, protocol constants, Docker, Bittensor setup |
