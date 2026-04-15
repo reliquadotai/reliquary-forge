@@ -7,6 +7,7 @@ from fastapi.responses import PlainTextResponse
 
 from ..observability import build_metrics_text
 from ..roles.policy_authority import make_policy_authority_decision, promote_checkpoint_to_policy, publish_distill_policy
+from ..roles.trainer import import_inference_window, publish_policy as publish_rl_policy, run_reasoning_rl_cycle
 from ..shared.bootstrap import bootstrap_runtime
 
 app = FastAPI(title="Reliquary Control Plane", version="0.2.0")
@@ -89,3 +90,45 @@ def promote_policy(payload: dict[str, Any]) -> dict[str, Any]:
         )
         registry.put_artifact(next_policy)
     return {"decision": decision, "next_policy": next_policy}
+
+
+@app.post("/rl/import")
+def import_reasoning_window(payload: dict[str, Any]) -> dict[str, Any]:
+    cfg, registry = bootstrap_runtime()
+    window_id = int(payload.get("window_id", 0))
+    source_window_id = payload.get("source_window_id")
+    policy = registry.latest_policy()
+    if policy is None or policy["payload"].get("env_id") != "reasoning":
+        policy = publish_rl_policy(cfg, window_id=window_id, env_id="reasoning")
+        registry.put_artifact(policy)
+    summary = import_inference_window(
+        registry,
+        cfg,
+        policy,
+        source_window_id=int(source_window_id) if source_window_id is not None else None,
+        target_window_id=window_id,
+    )
+    return {
+        "training_batch_artifact": summary["training_batch_artifact"],
+        "verdict_count": len(summary["verdict_artifacts"]),
+        "rollout_count": len(summary["rollout_artifacts"]),
+    }
+
+
+@app.post("/rl/cycle")
+def run_rl_cycle(payload: dict[str, Any]) -> dict[str, Any]:
+    cfg, registry = bootstrap_runtime()
+    window_id = int(payload.get("window_id", 0))
+    source_window_id = payload.get("source_window_id")
+    result = run_reasoning_rl_cycle(
+        registry,
+        cfg,
+        source_window_id=int(source_window_id) if source_window_id is not None else None,
+        window_id=window_id,
+    )
+    return {
+        "policy_artifact": result["policy_artifact"],
+        "training_batch_artifact": result["import_summary"]["training_batch_artifact"],
+        "decision_artifact": result["training_summary"]["decision_artifact"],
+        "next_policy_artifact": result["training_summary"]["next_policy_artifact"],
+    }

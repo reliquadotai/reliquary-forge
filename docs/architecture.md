@@ -1,6 +1,11 @@
 # System Architecture
 
-Reliquary is a verified decentralized on-policy RL system. Three roles — Trainer, Miner, and Validator — exchange content-addressed artifacts in a windowed loop. Each window produces a training step that advances the policy.
+Reliquary is a verified post-training platform with two connected runtime surfaces:
+
+- a live inference runtime that finalizes commodity data
+- a trainer quorum that consumes that finalized data for distillation and RL
+
+The platform uses content-addressed artifacts and benchmark-gated policy promotion across both lanes.
 
 ## Roles
 
@@ -10,13 +15,17 @@ The Trainer is the loop driver. It:
 
 1. **Publishes the policy** — creates a policy artifact specifying the model, environment config, generation parameters, and training hyperparameters. The policy ID is deterministic: `SHA-256` of the canonical policy content.
 
-2. **Generates challenges** — creates SAT challenge artifacts with deterministic seeds (`window_id * 10_000 + offset`). Each challenge contains a guaranteed-satisfiable k-SAT formula.
+2. **Generates challenges or imports commodity data**:
+   - for SAT, create challenge artifacts with deterministic seeds
+   - for reasoning RL, import finalized inference windows through the live registry adapter
 
 3. **Collects verdicts** — reads validator-produced verdict artifacts from the registry.
 
 4. **Trains** — builds GRPO groups from training-eligible verdicts, emits a training-batch artifact, runs a clipped on-policy update with before/after evaluation, saves the checkpoint.
 
 5. **Advances** — publishes the next policy pointing to the new checkpoint, starting the next window.
+
+5. **Gates promotion** — publishes a benchmark result, records a policy-authority decision, and only advances the next policy if the benchmark gate passes.
 
 **Source**: `reliquary/roles/trainer.py`
 
@@ -107,10 +116,11 @@ Window IDs are integers starting at 0. Artifacts carry their `window_id`, enabli
                            │
                            ▼
                     ┌─────────────┐
-                    │  GRPO Train │
-                    │  eval before│
-                    │  update     │
-                    │  eval after │
+                    │ Trainer Quorum│
+                    │ importer      │
+                    │ actor pool    │
+                    │ learner       │
+                    │ evaluator     │
                     └──────┬──────┘
                            │
                            ▼
@@ -147,6 +157,23 @@ The registry supports:
 - `latest_policy()` — get the most recent policy by `(window_id, created_at)`.
 
 See [artifacts.md](artifacts.md) for the full schema reference.
+
+## Live Registry Import
+
+Reliquary reads finalized reasoning windows from the inference runtime through an artifact-level adapter:
+
+- local same-host reads from the inference artifact root
+- R2-backed reads for remote trainer quorums
+- idempotent import cursors
+- replay-safe pinned window import
+
+Imported windows materialize as:
+
+- RL rollouts with source lineage
+- RL verdicts with deterministic reward fields
+- training-batch artifacts that keep the source registry and source window ids explicit
+
+See [reasoning-rl.md](reasoning-rl.md) for the full reasoning RL path.
 
 ## Chain Adapters
 

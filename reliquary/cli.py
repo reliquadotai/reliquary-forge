@@ -148,6 +148,39 @@ def run_rl_cycle_cmd(window: int = 0, source_window: int | None = None) -> None:
     )
 
 
+@app.command("run-rl-worker")
+def run_rl_worker_cmd(
+    once: bool = False,
+    start_window: int = 0,
+    source_window: int | None = None,
+    sleep_seconds: int | None = None,
+) -> None:
+    cfg, registry = bootstrap_runtime()
+    interval = sleep_seconds or int(cfg["rl_cycle_interval_seconds"])
+    next_window = int(start_window)
+    while True:
+        try:
+            result = run_reasoning_rl_cycle(
+                registry,
+                cfg,
+                source_window_id=source_window,
+                window_id=next_window,
+            )
+            typer.echo(
+                f"RL worker completed window {next_window} "
+                f"approved={result['training_summary']['decision_artifact']['payload']['approved']}"
+            )
+            imported_windows = result["import_summary"]["training_batch_artifact"]["payload"].get("source_window_ids", [])
+            if source_window is not None:
+                source_window = int(max(imported_windows)) + 1 if imported_windows else source_window + 1
+            next_window += 1
+        except FileNotFoundError:
+            typer.echo("No finalized inference window available yet; waiting.")
+        if once:
+            break
+        time.sleep(interval)
+
+
 @app.command("publish-distill-policy")
 def publish_distill_policy_cmd(window: int = 0) -> None:
     cfg, registry = bootstrap_runtime()

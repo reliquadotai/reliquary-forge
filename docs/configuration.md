@@ -69,6 +69,37 @@ The satisfiability phase transition for random k-SAT is near `m/n ~ 2^k * ln(2)`
 | `RELIQUARY_TRAIN_EPOCHS` | `1` | Training epochs per window |
 | `RELIQUARY_CLIP_EPS` | `0.2` | PPO/GRPO clipping epsilon |
 | `RELIQUARY_KL_COEF` | `0.0` | KL divergence penalty coefficient (0 = disabled) |
+| `RELIQUARY_RL_ENV_ID` | `reasoning` | Primary RL environment (`reasoning`, `sat`) |
+| `RELIQUARY_RL_TASK_SOURCE` | `reasoning_tasks` | Imported task source for the RL lane |
+| `RELIQUARY_RL_ACTOR_MODEL_REF` | value of `RELIQUARY_MODEL_NAME` | Actor model used by the trainer quorum |
+| `RELIQUARY_RL_REFERENCE_MODEL_REF` | value of `RELIQUARY_MODEL_NAME` | Reference model for RL evaluation and KL |
+| `RELIQUARY_RL_LEARNER_BACKEND` | `trl_async_grpo_fsdp2` | RL learner backend (`local_grpo`, `trl_async_grpo_fsdp2`, `nemo_rl`) |
+| `RELIQUARY_RL_BACKEND_EXECUTION_MODE` | `simulate` | Dense backend execution mode (`simulate`, `local_compat`) |
+| `RELIQUARY_RL_MODEL_FAMILY` | `qwen-dense` | Trainer family label recorded into artifacts |
+| `RELIQUARY_RL_REASONING_EVAL_COUNT` | `8` | Holdout reasoning task count for RL evaluator runs |
+| `RELIQUARY_RL_HOLDOUT_METRIC_MIN` | `0.0` | Minimum benchmark delta required for promotion |
+| `RELIQUARY_RL_CONTRACT_SCORE_MIN` | `0.0` | Optional floor for contract-score gating |
+| `RELIQUARY_RL_CYCLE_INTERVAL_SECONDS` | `900` | Poll interval for the autonomous RL worker |
+| `RELIQUARY_RL_VLLM_ACTOR_ENDPOINTS` | `""` | Comma-separated vLLM actor endpoints used by the dense backend |
+| `RELIQUARY_NEMO_EXECUTION_MODE` | `simulate` | NeMo backend execution mode |
+
+### Inference Import and Trainer Quorum
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `RELIQUARY_INFERENCE_REGISTRY_BACKEND` | `local` | Source backend for finalized inference windows (`local`, `r2`) |
+| `RELIQUARY_INFERENCE_REGISTRY_LOCAL_ROOT` | `/srv/reliquary-inference/state/artifacts` | Same-host inference artifact root |
+| `RELIQUARY_INFERENCE_REGISTRY_BUCKET` | `""` | R2 bucket for finalized inference windows |
+| `RELIQUARY_INFERENCE_REGISTRY_ENDPOINT_URL` | `""` | R2 endpoint URL for finalized inference windows |
+| `RELIQUARY_INFERENCE_REGISTRY_ACCESS_KEY_ID` | `""` | Access key for inference registry reads |
+| `RELIQUARY_INFERENCE_REGISTRY_SECRET_ACCESS_KEY` | `""` | Secret key for inference registry reads |
+| `RELIQUARY_INFERENCE_REGISTRY_REGION` | `auto` | Region label for object-store client construction |
+| `RELIQUARY_INFERENCE_IMPORT_CURSOR_NAME` | `reasoning_rl` | Cursor file name used by the autonomous RL worker |
+| `RELIQUARY_RAY_CLUSTER_PROFILE` | `single-node` | Cluster profile label exported into artifacts and metrics |
+| `RELIQUARY_RAY_HEAD_ADDRESS` | `local` | Ray head address for trainer-quorum workers |
+| `RELIQUARY_RAY_ACTOR_REPLICAS` | `1` | Desired actor worker replica count |
+| `RELIQUARY_RAY_LEARNER_REPLICAS` | `1` | Desired learner worker replica count |
+| `RELIQUARY_RAY_EVALUATOR_REPLICAS` | `1` | Desired evaluator worker replica count |
 
 ### Distillation
 

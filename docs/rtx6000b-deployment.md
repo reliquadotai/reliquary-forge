@@ -35,6 +35,7 @@ The node uses four long-lived services:
 - `reliquary-vllm.service`
 - `reliquary-control-plane.service`
 - `reliquary-distill-worker.service`
+- `reliquary-rl-worker.service`
 - `reliquary-github-runner.service`
 
 On the reference RTX6000B stack, `reliquary-vllm.service` runs `vLLM` with `--enforce-eager` and a reduced `RELIQUARY_VLLM_GPU_MEMORY_UTILIZATION` budget. This avoids unstable compile / CUDA-graph startup paths on the Blackwell host while leaving enough VRAM for the local LoRA learner to run on the same node.
@@ -51,6 +52,13 @@ Keep `reliquary-distill-worker.service` installed but operator-controlled. Start
 ```bash
 systemctl enable reliquary-distill-worker.service
 systemctl start reliquary-distill-worker.service
+```
+
+Use `reliquary-rl-worker.service` the same way for the reasoning RL lane. It polls finalized inference windows through the configured registry adapter, imports new windows idempotently, and only advances the next RL policy if the benchmark gate passes:
+
+```bash
+systemctl enable reliquary-rl-worker.service
+systemctl start reliquary-rl-worker.service
 ```
 
 The control plane stays private. Reach it over SSH tunneling:

@@ -135,6 +135,7 @@ def load_runtime_config() -> dict:
         "ray_evaluator_replicas": _env_int("RELIQUARY_RAY_EVALUATOR_REPLICAS", 1),
         "rl_vllm_actor_endpoints": _env_str("RELIQUARY_RL_VLLM_ACTOR_ENDPOINTS", ""),
         "nemo_execution_mode": _env_str("RELIQUARY_NEMO_EXECUTION_MODE", "simulate"),
+        "rl_cycle_interval_seconds": _env_int("RELIQUARY_RL_CYCLE_INTERVAL_SECONDS", 900),
         "distill_learner_backend": _env_str(
             "RELIQUARY_DISTILL_LEARNER_BACKEND",
             "local_reasoning_student",

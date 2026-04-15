@@ -24,6 +24,8 @@ Default bind settings come from:
 | `GET /policies/latest` | Return the latest published policy |
 | `POST /policy-authority/publish` | Publish a new distillation policy |
 | `POST /policy-authority/promote` | Record a policy-authority decision and optionally promote a checkpoint |
+| `POST /rl/import` | Import one finalized reasoning window into RL artifacts |
+| `POST /rl/cycle` | Run one off-chain reasoning RL cycle from finalized inference data |
 
 ## Production intent
 

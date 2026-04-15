@@ -106,3 +106,30 @@ def test_metrics_endpoint_exports_platform_summary(monkeypatch) -> None:
     assert "reliquary_recent_accepted_traces 6.0" in response.text
     assert "reliquary_latest_imported_source_window 6911280.0" in response.text
     assert "reliquary_latest_rl_queue_depth 3.0" in response.text
+
+
+def test_rl_cycle_endpoint_returns_summary(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "reliquary.control.api.bootstrap_runtime",
+        lambda: (
+            {},
+            _FakeRegistry(),
+        ),
+    )
+    monkeypatch.setattr(
+        "reliquary.control.api.run_reasoning_rl_cycle",
+        lambda registry, cfg, source_window_id=None, window_id=0: {
+            "policy_artifact": {"artifact_id": "policy-1"},
+            "import_summary": {"training_batch_artifact": {"artifact_id": "batch-1"}},
+            "training_summary": {
+                "decision_artifact": {"artifact_id": "decision-1"},
+                "next_policy_artifact": {"artifact_id": "policy-2"},
+            },
+        },
+    )
+    client = TestClient(app)
+
+    response = client.post("/rl/cycle", json={"window_id": 0, "source_window_id": 6911280})
+
+    assert response.status_code == 200
+    assert response.json()["training_batch_artifact"]["artifact_id"] == "batch-1"
