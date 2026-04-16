@@ -42,7 +42,7 @@ def _cfg(tmp_path: Path) -> dict:
         "rl_actor_model_ref": "reasoning-student://bootstrap",
         "rl_reference_model_ref": "reasoning-student://bootstrap",
         "rl_learner_backend": "trl_async_grpo_fsdp2",
-        "rl_backend_execution_mode": "simulate",
+        "rl_backend_execution_mode": "local_compat",
         "rl_reasoning_eval_count": 4,
         "policy_authority_mode": "trusted_quorum",
         "policy_authority_quorum": "trainer,validator",
@@ -316,7 +316,7 @@ def test_rl_training_falls_back_to_previous_policy_when_benchmark_regresses(tmp_
             output_dir = kwargs["output_dir"]
             output_dir.mkdir(parents=True, exist_ok=True)
             _write_json(output_dir / "reasoning_capabilities.json", {"supported_operations": []})
-            return {"checkpoint_path": str(output_dir), "execution_mode": "simulate", "cluster_profile": {"control_plane": "ray"}}
+            return {"checkpoint_path": str(output_dir), "execution_mode": "local_compat", "cluster_profile": {"control_plane": "ray"}}
 
     eval_states = iter(
         [
@@ -331,6 +331,150 @@ def test_rl_training_falls_back_to_previous_policy_when_benchmark_regresses(tmp_
 
     assert summary["decision_artifact"]["payload"]["approved"] is False
     assert summary["next_policy_artifact"]["payload"]["model_ref"] == policy["payload"]["model_ref"]
+
+
+def test_dense_backend_ray_cluster_mode_uses_remote_runner(tmp_path: Path, monkeypatch) -> None:
+    cfg = _cfg(tmp_path)
+    cfg["rl_backend_execution_mode"] = "ray_cluster"
+    cfg["rl_vllm_actor_endpoints"] = "http://127.0.0.1:8100"
+    groups = [
+        {
+            "challenge_id": "task-1",
+            "prompt": "Add 2 and 3",
+            "env_id": "reasoning",
+            "task_source": "reasoning_tasks",
+            "samples": [
+                {
+                    "full_token_ids": [1, 2, 3],
+                    "prompt_token_ids": [1],
+                    "completion_token_ids": [2, 3],
+                    "completion_text": "Reasoning: add\nFinal Answer: 5",
+                    "old_logprobs": [-0.1, -0.2],
+                    "old_sum_logprob": -0.3,
+                    "reward": 1.0,
+                    "binary_score": 1.0,
+                    "advantage": 0.0,
+                    "task_metadata": {"operation": "add"},
+                }
+            ],
+        }
+    ]
+    calls: list[dict] = []
+
+    def _fake_remote(**kwargs):
+        calls.append(kwargs)
+        output_dir = kwargs["output_dir"]
+        output_dir.mkdir(parents=True, exist_ok=True)
+        _write_json(output_dir / "reasoning_capabilities.json", {"supported_operations": ["add"], "record_count": 1})
+        _write_json(output_dir / "training_summary.json", {"status": "ok", "steps": 2})
+        return {
+            "accepted_samples": 1,
+            "groups": 1,
+            "mean_loss": 0.1,
+            "steps": 2,
+            "status": "ok",
+            "checkpoint_path": str(output_dir),
+        }
+
+    monkeypatch.setattr("reliquary.training.backends.run_grpo_training_remote", _fake_remote)
+
+    backend = build_rl_learner_backend("trl_async_grpo_fsdp2")
+    summary = backend.train(
+        model_ref="reasoning-student://bootstrap",
+        groups=groups,
+        output_dir=tmp_path / "ray-cluster-backend",
+        device="cpu",
+        cfg=cfg,
+    )
+
+    assert calls
+    assert calls[0]["ray_address"] == "local"
+    assert summary["execution_mode"] == "ray_cluster"
+    assert summary["cluster_profile"]["actor_endpoints"] == ["http://127.0.0.1:8100"]
+    assert Path(summary["run_spec_path"]).exists()
+
+
+def test_train_window_uses_remote_reasoning_evaluator_in_ray_cluster_mode(tmp_path: Path, monkeypatch) -> None:
+    cfg = _cfg(tmp_path)
+    cfg["rl_backend_execution_mode"] = "ray_cluster"
+    cfg["rl_vllm_actor_endpoints"] = "http://127.0.0.1:8100"
+    registry = LocalArtifactRegistry(cfg["artifact_dir"])
+    policy = publish_policy(cfg, window_id=0, env_id="reasoning")
+    registry.put_artifact(policy)
+    verdict = make_artifact(
+        artifact_type="verdict",
+        producer_id="validator",
+        producer_role="validator",
+        policy_id=policy["artifact_id"],
+        window_id=0,
+        lane="rl",
+        commodity_use="dual_use",
+        payload={
+            "env_id": "reasoning",
+            "task_source": "reasoning_tasks",
+            "challenge_id": "task-1",
+            "task_id": "task-1",
+            "accepted": True,
+            "training_eligible": True,
+            "score": 1.0,
+            "dense_reward": 1.0,
+            "challenge": {"prompt": "Add 1 and 2", "task": {"operation": "add"}},
+            "generation": {
+                "sequence_token_ids": [1, 2, 3],
+                "prompt_token_ids": [1],
+                "completion_token_ids": [2, 3],
+                "completion_text": "Reasoning: add\nFinal Answer: 3",
+                "completion_logprobs": [-0.1, -0.2],
+                "sum_logprob": -0.3,
+            },
+        },
+    )
+
+    class FakeBackend:
+        name = "trl_async_grpo_fsdp2"
+
+        def train(self, **kwargs):
+            output_dir = kwargs["output_dir"]
+            output_dir.mkdir(parents=True, exist_ok=True)
+            _write_json(output_dir / "reasoning_capabilities.json", {"supported_operations": ["add"]})
+            return {
+                "checkpoint_path": str(output_dir),
+                "execution_mode": "ray_cluster",
+                "cluster_profile": {"control_plane": "ray"},
+            }
+
+    eval_calls: list[str] = []
+    eval_states = iter(
+        [
+            {
+                "answer_accuracy": 0.8,
+                "accepted_rate": 0.8,
+                "format_rate": 0.8,
+                "policy_compliance": 0.8,
+                "contract_score": 0.8,
+            },
+            {
+                "answer_accuracy": 0.9,
+                "accepted_rate": 0.9,
+                "format_rate": 0.9,
+                "policy_compliance": 0.9,
+                "contract_score": 0.9,
+            },
+        ]
+    )
+
+    def _fake_remote_eval(**kwargs):
+        eval_calls.append(kwargs["model_ref"])
+        return next(eval_states)
+
+    monkeypatch.setattr("reliquary.roles.trainer.build_rl_learner_backend", lambda name: FakeBackend())
+    monkeypatch.setattr("reliquary.roles.trainer.evaluate_reasoning_checkpoint_remote", _fake_remote_eval)
+
+    summary = train_window(registry, cfg, policy, [verdict], window_id=0)
+
+    assert len(eval_calls) == 2
+    assert summary["benchmark_result_artifact"]["payload"]["holdout_metric"] > 0.0
+    assert summary["decision_artifact"]["payload"]["approved"] is True
 
 
 def test_dense_and_nemo_backends_share_training_contract(tmp_path: Path) -> None:

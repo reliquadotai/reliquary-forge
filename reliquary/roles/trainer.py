@@ -10,6 +10,7 @@ from ..storage.registry import ArtifactRegistry
 from ..training.backends import build_rl_learner_backend, evaluate_reasoning_checkpoint
 from ..training.eval import evaluate_policy
 from ..training.grpo import build_grpo_groups
+from ..training.ray_cluster import evaluate_reasoning_checkpoint_remote
 from ..utils.json_io import write_json
 from .policy_authority import make_policy_authority_decision
 
@@ -203,6 +204,13 @@ def generate_challenge_artifacts(
 def _evaluate_rl_model(*, cfg: dict[str, Any], policy_artifact: dict[str, Any], model_ref: str) -> dict[str, Any]:
     env_id = str(policy_artifact["payload"].get("env_id", "sat"))
     if env_id == "reasoning":
+        execution_mode = str(cfg.get("rl_backend_execution_mode", "local_compat")).strip().lower()
+        if execution_mode == "ray_cluster":
+            return evaluate_reasoning_checkpoint_remote(
+                model_ref=model_ref,
+                holdout_count=int(cfg.get("rl_reasoning_eval_count", cfg.get("distill_holdout_count", 8))),
+                cfg=cfg,
+            )
         return evaluate_reasoning_checkpoint(
             model_ref=model_ref,
             holdout_count=int(cfg.get("rl_reasoning_eval_count", cfg.get("distill_holdout_count", 8))),

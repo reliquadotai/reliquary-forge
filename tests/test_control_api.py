@@ -104,6 +104,7 @@ def test_metrics_endpoint_exports_platform_summary(monkeypatch) -> None:
     assert "reliquary_control_plane_up 1.0" in response.text
     assert "reliquary_latest_benchmark_delta 0.125" in response.text
     assert "reliquary_recent_accepted_traces 6.0" in response.text
+    assert "reliquary_latest_available_source_window -1.0" in response.text
     assert "reliquary_latest_imported_source_window 6911280.0" in response.text
     assert "reliquary_latest_rl_queue_depth 3.0" in response.text
     assert "reliquary_rl_worker_next_window -1.0" in response.text

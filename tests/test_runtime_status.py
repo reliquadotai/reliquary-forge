@@ -1,7 +1,32 @@
+import json
 from pathlib import Path
 
 from reliquary.protocol.artifacts import make_artifact
 from reliquary.runtime_status import build_platform_status, read_rl_worker_status, write_rl_worker_status
+
+
+def _seed_inference_manifest(root: Path, *, window_id: int) -> None:
+    manifest = {
+        "artifact_id": f"manifest-{window_id}",
+        "artifact_type": "window_manifest",
+        "producer_id": "validator",
+        "producer_role": "validator",
+        "window_id": window_id,
+        "created_at": "2026-04-16T00:00:00Z",
+        "parent_ids": [],
+        "payload": {
+            "task_batch_id": "task-batch-1",
+            "completion_bundle_refs": [],
+            "verdict_bundle_ref": None,
+            "scorecard_id": "scorecard-1",
+            "task_source": "reasoning_tasks",
+            "window_randomness_ref": {"public_randomness": "abcd"},
+            "chain_publish_result": {"success": True},
+        },
+    }
+    path = root / "window_manifests" / f"manifest-{window_id}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(manifest), encoding="utf-8")
 
 
 class _FakeRegistry:
@@ -70,7 +95,10 @@ def test_rl_worker_status_roundtrip_and_platform_summary(tmp_path: Path) -> None
         "artifact_registry_backend": "local",
         "rl_learner_backend": "trl_async_grpo_fsdp2",
         "ray_cluster_profile": "single-node",
+        "inference_registry_backend": "local",
+        "inference_registry_local_root": str(tmp_path / "inference"),
     }
+    _seed_inference_manifest(Path(cfg["inference_registry_local_root"]), window_id=6911284)
     write_rl_worker_status(
         cfg,
         {
@@ -90,6 +118,8 @@ def test_rl_worker_status_roundtrip_and_platform_summary(tmp_path: Path) -> None
     assert saved is not None
     assert saved["next_window"] == 8
     assert summary["latest_policy_window"] == 7
+    assert summary["latest_available_source_window"] == 6911284
+    assert summary["import_lag_windows"] == 4.0
     assert summary["latest_imported_source_window"] == 6911280
     assert summary["rl_worker"]["next_window"] == 8
     assert summary["rl_worker"]["last_decision_approved"] is True

@@ -106,7 +106,9 @@ Reliquary treats finalized reasoning windows as an importable commodity surface 
 - reasoning verdicts carry deterministic reward inputs such as final answer, correctness, policy compliance, format status, difficulty, and contamination overlap
 - the RL lane reads those finalized windows through an artifact-level registry adapter, not through shared Python internals
 - imported windows materialize as environment-agnostic trajectories, verdicts, and training batches with explicit lineage back to the source registry and window ids
-- dense RL uses a TRL/vLLM/FSDP2-oriented backend by default and emits Ray-oriented cluster manifests even in local-compatible execution mode
+- dense RL uses a TRL/vLLM/FSDP2-oriented backend by default with two explicit modes:
+  - `local_compat` for smoke and single-node bring-up
+  - `ray_cluster` for the intended multi-node trainer quorum
 - NeMo-oriented runs consume the same training-batch contract and emit compatible checkpoint and benchmark artifacts
 
 ## Setup

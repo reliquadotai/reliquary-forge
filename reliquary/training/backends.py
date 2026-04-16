@@ -12,6 +12,7 @@ from ..envs.reasoning import (
     summarize_reasoning_evaluations,
 )
 from ..protocol.artifacts import make_artifact
+from ..training.ray_cluster import evaluate_reasoning_checkpoint_remote, run_grpo_training_remote
 from ..storage.registry import ArtifactRegistry
 from ..utils.json_io import read_json, write_json
 
@@ -304,6 +305,17 @@ def _cluster_profile(cfg: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _normalize_dense_execution_mode(mode: str) -> str:
+    normalized = str(mode or "").strip().lower()
+    if normalized in {"", "simulate"}:
+        return "local_compat"
+    if normalized in {"local_compat", "ray_cluster"}:
+        return normalized
+    raise ValueError(
+        "Unsupported RL backend execution mode. Expected 'local_compat' or 'ray_cluster'."
+    )
+
+
 def _write_backend_bundle(output_dir: Path, spec_name: str, payload: dict[str, Any]) -> Path:
     path = output_dir / spec_name
     write_json(path, payload)
@@ -340,7 +352,9 @@ class TRLAsyncGRPOFSDP2Backend:
         epochs: int | None = None,
     ) -> dict[str, Any]:
         output_dir.mkdir(parents=True, exist_ok=True)
-        execution_mode = str(cfg.get("rl_backend_execution_mode", "simulate"))
+        execution_mode = _normalize_dense_execution_mode(
+            str(cfg.get("rl_backend_execution_mode", "local_compat"))
+        )
         cluster_profile = _cluster_profile(cfg)
         run_spec = {
             "backend": self.name,
@@ -373,6 +387,8 @@ class TRLAsyncGRPOFSDP2Backend:
             },
         )
         if execution_mode == "local_compat":
+            from .grpo import train_grpo_checkpoint
+
             summary = train_grpo_checkpoint(
                 model_ref=model_ref,
                 groups=groups,
@@ -383,16 +399,25 @@ class TRLAsyncGRPOFSDP2Backend:
                 kl_coef=float(kl_coef if kl_coef is not None else cfg.get("kl_coef", 0.0)),
                 epochs=int(epochs if epochs is not None else cfg.get("train_epochs", 1)),
             )
+        elif execution_mode == "ray_cluster":
+            actor_endpoints = cluster_profile["actor_endpoints"]
+            if not actor_endpoints:
+                raise RuntimeError(
+                    "ray_cluster execution requires RELIQUARY_RL_VLLM_ACTOR_ENDPOINTS to be set."
+                )
+            summary = run_grpo_training_remote(
+                ray_address=str(cfg.get("ray_head_address", "local")),
+                model_ref=model_ref,
+                groups=groups,
+                output_dir=output_dir,
+                device=device,
+                lr=float(lr if lr is not None else cfg.get("train_lr", 1e-5)),
+                clip_eps=float(clip_eps if clip_eps is not None else cfg.get("clip_eps", 0.2)),
+                kl_coef=float(kl_coef if kl_coef is not None else cfg.get("kl_coef", 0.0)),
+                epochs=int(epochs if epochs is not None else cfg.get("train_epochs", 1)),
+            )
         else:
-            _simulate_reasoning_checkpoint(output_dir, groups)
-            summary = {
-                "accepted_samples": sum(len(group.get("samples", [])) for group in groups),
-                "groups": len(groups),
-                "mean_loss": 0.0,
-                "steps": 0,
-                "status": "simulated",
-            }
-            write_json(output_dir / "training_summary.json", summary)
+            raise AssertionError(f"Unhandled dense execution mode: {execution_mode}")
         summary.update(
             {
                 "backend": self.name,
@@ -627,7 +652,9 @@ class NeMoRLBackend:
         **_: Any,
     ) -> dict[str, Any]:
         output_dir.mkdir(parents=True, exist_ok=True)
-        execution_mode = str(cfg.get("nemo_execution_mode", cfg.get("rl_backend_execution_mode", "simulate")))
+        execution_mode = str(
+            cfg.get("nemo_execution_mode", cfg.get("rl_backend_execution_mode", "local_compat"))
+        )
         cluster_profile = _cluster_profile(cfg)
         nemo_spec = {
             "backend": self.name,
@@ -648,7 +675,7 @@ class NeMoRLBackend:
         summary = {
             "backend": self.name,
             "execution_mode": execution_mode,
-            "status": "simulated",
+            "status": "compatibility_only",
             "accepted_samples": sum(len(group.get("samples", [])) for group in groups),
             "groups": len(groups),
             "checkpoint_path": str(output_dir),

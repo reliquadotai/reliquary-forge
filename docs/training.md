@@ -170,6 +170,35 @@ For reasoning RL, the evaluator measures:
 
 The promotion gate uses the benchmark artifact produced from those metrics rather than raw trainer output.
 
+## Dense Backend Modes
+
+The dense reasoning backend `trl_async_grpo_fsdp2` now has two explicit execution modes:
+
+- `local_compat`
+  - direct single-node execution
+  - intended for smoke tests, workstation bring-up, and fallback validation
+- `ray_cluster`
+  - Ray-managed remote execution
+  - intended for the real trainer quorum
+  - requires configured vLLM actor endpoints and a reachable Ray head address
+
+Both modes emit the same artifact family:
+
+- `training_batch`
+- `checkpoint`
+- `benchmark_result`
+- `policy_authority_decision`
+
+and preserve the same lineage fields:
+
+- source registry metadata
+- source window ids
+- reward contract
+- backend identity
+- cluster profile
+
+The NeMo backend remains artifact-compatible, but it is kept as a compatibility path until the dense route is repeatedly stable under real cluster execution.
+
 ## Hyperparameters
 
 | Parameter | Env Variable | Default | Effect |

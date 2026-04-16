@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .inference_adapter import InferenceRegistryAdapter
 from .utils.json_io import read_json, write_json
 
 
@@ -78,6 +79,24 @@ def build_platform_status(cfg: dict[str, Any], registry) -> dict[str, Any]:
         source_window_ids = latest_rl_batch.get("payload", {}).get("source_window_ids", [])
         latest_imported_window = int(max(source_window_ids)) if source_window_ids else None
         latest_queue_depth = int(latest_rl_batch.get("payload", {}).get("training_eligible_count", 0))
+    if latest_imported_window is None and worker_status.get("last_imported_source_window") is not None:
+        latest_imported_window = int(worker_status["last_imported_source_window"])
+    latest_available_source_window = None
+    import_lag_windows = None
+    try:
+        adapter = InferenceRegistryAdapter(cfg, runtime_status_dir(cfg))
+        manifests = adapter.finalized_window_manifests(limit=1)
+        if manifests:
+            latest_available_source_window = int(manifests[-1]["window_id"])
+            if latest_imported_window is None:
+                import_lag_windows = float(latest_available_source_window)
+            else:
+                import_lag_windows = float(
+                    max(0, latest_available_source_window - latest_imported_window)
+                )
+    except Exception:
+        latest_available_source_window = None
+        import_lag_windows = None
 
     last_success_at = _parse_timestamp(worker_status.get("last_success_at"))
     last_failure_at = _parse_timestamp(worker_status.get("last_failure_at"))
@@ -101,6 +120,8 @@ def build_platform_status(cfg: dict[str, Any], registry) -> dict[str, Any]:
             if latest_decision is not None
             else None
         ),
+        "latest_available_source_window": latest_available_source_window,
+        "import_lag_windows": import_lag_windows,
         "latest_imported_source_window": latest_imported_window,
         "latest_rl_queue_depth": latest_queue_depth,
         "rl_worker": {

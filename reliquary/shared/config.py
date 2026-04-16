@@ -108,7 +108,7 @@ def load_runtime_config() -> dict:
         "rl_actor_model_ref": _env_str("RELIQUARY_RL_ACTOR_MODEL_REF", model_name),
         "rl_reference_model_ref": _env_str("RELIQUARY_RL_REFERENCE_MODEL_REF", model_name),
         "rl_learner_backend": _env_str("RELIQUARY_RL_LEARNER_BACKEND", "trl_async_grpo_fsdp2"),
-        "rl_backend_execution_mode": _env_str("RELIQUARY_RL_BACKEND_EXECUTION_MODE", "simulate"),
+        "rl_backend_execution_mode": _env_str("RELIQUARY_RL_BACKEND_EXECUTION_MODE", "local_compat"),
         "rl_model_family": _env_str("RELIQUARY_RL_MODEL_FAMILY", "qwen-dense"),
         "rl_reasoning_eval_count": _env_int("RELIQUARY_RL_REASONING_EVAL_COUNT", 8),
         "rl_holdout_metric_min": _env_float("RELIQUARY_RL_HOLDOUT_METRIC_MIN", 0.0),

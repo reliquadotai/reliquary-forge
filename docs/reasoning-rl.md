@@ -56,11 +56,13 @@ Two learner backends share the same `training_batch` contract:
 - `trl_async_grpo_fsdp2`
   - default dense path
   - TRL/vLLM/FSDP2-oriented run spec
-  - local-compatible execution mode for smoke and staging runs
+  - `local_compat` mode for smoke and single-node validation
+  - `ray_cluster` mode for the intended multi-node trainer quorum
 - `nemo_rl`
   - MoE-ready path
   - NeMo-oriented execution manifest
   - artifact-compatible with the dense path
+  - kept in compatibility mode until the dense backend has repeated stable cycles
 
 Both backends emit:
 
@@ -95,3 +97,12 @@ For live nodes, configure:
 - `RELIQUARY_RAY_*`
 
 in `/Users/malouk/GRAIL/reliquary/deploy/reliquary-node.env.example`.
+
+For the dense trainer quorum, the sober operator sequence is:
+
+1. point `RELIQUARY_INFERENCE_REGISTRY_*` at the finalized inference registry
+2. set `RELIQUARY_RL_BACKEND_EXECUTION_MODE=ray_cluster`
+3. configure `RELIQUARY_RAY_HEAD_ADDRESS` and the Ray replica counts
+4. set `RELIQUARY_RL_VLLM_ACTOR_ENDPOINTS` to the serving endpoints used by the actor pool
+5. run one import and one RL cycle locally
+6. enable the continuous RL worker only after the single-cycle path is stable

@@ -98,6 +98,16 @@ def build_metrics_text(cfg: dict[str, Any], registry) -> str:
         if platform_status["latest_imported_source_window"] is not None
         else -1.0
     )
+    latest_available_source_window = (
+        float(platform_status["latest_available_source_window"])
+        if platform_status["latest_available_source_window"] is not None
+        else -1.0
+    )
+    import_lag_windows = (
+        float(platform_status["import_lag_windows"])
+        if platform_status["import_lag_windows"] is not None
+        else -1.0
+    )
     latest_queue_depth = float(platform_status["latest_rl_queue_depth"])
     worker_status = platform_status["rl_worker"]
     last_success_age = (
@@ -171,6 +181,14 @@ def build_metrics_text(cfg: dict[str, Any], registry) -> str:
         "reliquary_latest_imported_source_window": (
             latest_imported_window,
             "Latest finalized inference window imported into the RL lane.",
+        ),
+        "reliquary_latest_available_source_window": (
+            latest_available_source_window,
+            "Latest finalized inference window currently available from the upstream registry.",
+        ),
+        "reliquary_rl_import_lag_windows": (
+            import_lag_windows,
+            "Difference between latest available and latest imported finalized inference windows.",
         ),
         "reliquary_latest_rl_queue_depth": (
             latest_queue_depth,

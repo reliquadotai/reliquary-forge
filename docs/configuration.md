@@ -74,16 +74,22 @@ The satisfiability phase transition for random k-SAT is near `m/n ~ 2^k * ln(2)`
 | `RELIQUARY_RL_ACTOR_MODEL_REF` | value of `RELIQUARY_MODEL_NAME` | Actor model used by the trainer quorum |
 | `RELIQUARY_RL_REFERENCE_MODEL_REF` | value of `RELIQUARY_MODEL_NAME` | Reference model for RL evaluation and KL |
 | `RELIQUARY_RL_LEARNER_BACKEND` | `trl_async_grpo_fsdp2` | RL learner backend (`local_grpo`, `trl_async_grpo_fsdp2`, `nemo_rl`) |
-| `RELIQUARY_RL_BACKEND_EXECUTION_MODE` | `simulate` | Dense backend execution mode (`simulate`, `local_compat`) |
+| `RELIQUARY_RL_BACKEND_EXECUTION_MODE` | `local_compat` | Dense backend execution mode (`local_compat`, `ray_cluster`) |
 | `RELIQUARY_RL_MODEL_FAMILY` | `qwen-dense` | Trainer family label recorded into artifacts |
 | `RELIQUARY_RL_REASONING_EVAL_COUNT` | `8` | Holdout reasoning task count for RL evaluator runs |
 | `RELIQUARY_RL_HOLDOUT_METRIC_MIN` | `0.0` | Minimum benchmark delta required for promotion |
 | `RELIQUARY_RL_CONTRACT_SCORE_MIN` | `0.0` | Optional floor for contract-score gating |
 | `RELIQUARY_RL_CYCLE_INTERVAL_SECONDS` | `900` | Poll interval for the autonomous RL worker |
 | `RELIQUARY_RL_VLLM_ACTOR_ENDPOINTS` | `""` | Comma-separated vLLM actor endpoints used by the dense backend |
-| `RELIQUARY_NEMO_EXECUTION_MODE` | `simulate` | NeMo backend execution mode |
+| `RELIQUARY_NEMO_EXECUTION_MODE` | `simulate` | NeMo compatibility execution mode |
 
 The RL worker persists its own runtime state under `${RELIQUARY_STATE_ROOT}/runtime/rl_worker_status.json` so service restarts can resume without losing the next target window.
+The dense RL backend is intentionally narrowed to two modes:
+
+- `local_compat` for smoke tests, single-node validation, and fallback bring-up
+- `ray_cluster` for the intended multi-node trainer quorum with explicit Ray and vLLM actor configuration
+
+`RELIQUARY_RL_VLLM_ACTOR_ENDPOINTS` should be non-empty when `RELIQUARY_RL_BACKEND_EXECUTION_MODE=ray_cluster`.
 
 ### Inference Import and Trainer Quorum
 
