@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import json
 import time
 
 import typer
@@ -18,6 +19,7 @@ from .roles.trainer import (
     run_reasoning_rl_cycle,
     train_window,
 )
+from .runtime_status import build_platform_status, read_rl_worker_status, write_rl_worker_status
 from .roles.validator import validate_distill_window, validate_window
 from .shared.bootstrap import bootstrap_runtime
 from .showcase.orchestrator import run_showcase
@@ -26,6 +28,12 @@ from .showcase.profiles import get_demo_profile
 from .utils.json_io import write_json
 
 app = typer.Typer(no_args_is_help=True)
+
+
+@app.command("status")
+def status_cmd() -> None:
+    cfg, registry = bootstrap_runtime()
+    typer.echo(json.dumps(build_platform_status(cfg, registry), indent=2, sort_keys=True))
 
 
 @app.command("publish-policy")
@@ -151,31 +159,89 @@ def run_rl_cycle_cmd(window: int = 0, source_window: int | None = None) -> None:
 @app.command("run-rl-worker")
 def run_rl_worker_cmd(
     once: bool = False,
-    start_window: int = 0,
+    start_window: int | None = None,
     source_window: int | None = None,
     sleep_seconds: int | None = None,
 ) -> None:
     cfg, registry = bootstrap_runtime()
     interval = sleep_seconds or int(cfg["rl_cycle_interval_seconds"])
-    next_window = int(start_window)
+    previous_state = read_rl_worker_status(cfg) or {}
+    next_window = int(start_window) if start_window is not None else int(previous_state.get("next_window", 0))
+    configured_source_window = source_window if source_window is not None else previous_state.get("configured_source_window")
+    write_rl_worker_status(
+        cfg,
+        {
+            "state": "running",
+            "next_window": next_window,
+            "configured_source_window": configured_source_window,
+            "waiting_for_data": False,
+            "last_error": "",
+        },
+    )
     while True:
         try:
             result = run_reasoning_rl_cycle(
                 registry,
                 cfg,
-                source_window_id=source_window,
+                source_window_id=int(source_window) if source_window is not None else None,
                 window_id=next_window,
             )
+            training = result["training_summary"]
+            imported_windows = result["import_summary"]["training_batch_artifact"]["payload"].get("source_window_ids", [])
+            last_imported_source_window = int(max(imported_windows)) if imported_windows else None
+            cycle_state = read_rl_worker_status(cfg) or {}
             typer.echo(
                 f"RL worker completed window {next_window} "
-                f"approved={result['training_summary']['decision_artifact']['payload']['approved']}"
+                f"approved={training['decision_artifact']['payload']['approved']}"
             )
-            imported_windows = result["import_summary"]["training_batch_artifact"]["payload"].get("source_window_ids", [])
             if source_window is not None:
                 source_window = int(max(imported_windows)) + 1 if imported_windows else source_window + 1
+            write_rl_worker_status(
+                cfg,
+                {
+                    "state": "running",
+                    "next_window": next_window + 1,
+                    "configured_source_window": source_window if source_window is not None else configured_source_window,
+                    "last_imported_source_window": last_imported_source_window,
+                    "last_success_window": next_window,
+                    "last_success_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                    "last_decision_approved": bool(training["decision_artifact"]["payload"]["approved"]),
+                    "last_holdout_metric": float(training["benchmark_result_artifact"]["payload"]["holdout_metric"]),
+                    "waiting_for_data": False,
+                    "consecutive_failures": 0,
+                    "cycle_count": int(cycle_state.get("cycle_count", 0)) + 1,
+                    "last_error": "",
+                },
+            )
             next_window += 1
         except FileNotFoundError:
             typer.echo("No finalized inference window available yet; waiting.")
+            write_rl_worker_status(
+                cfg,
+                {
+                    "state": "waiting_for_data",
+                    "next_window": next_window,
+                    "configured_source_window": source_window if source_window is not None else configured_source_window,
+                    "waiting_for_data": True,
+                },
+            )
+        except Exception as exc:
+            failure_state = read_rl_worker_status(cfg) or {}
+            write_rl_worker_status(
+                cfg,
+                {
+                    "state": "failed",
+                    "next_window": next_window,
+                    "configured_source_window": source_window if source_window is not None else configured_source_window,
+                    "waiting_for_data": False,
+                    "last_failure_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                    "consecutive_failures": int(failure_state.get("consecutive_failures", 0)) + 1,
+                    "last_error": repr(exc),
+                },
+            )
+            if once:
+                raise
+            typer.echo(f"RL worker failed for window {next_window}: {exc!r}")
         if once:
             break
         time.sleep(interval)

@@ -12,8 +12,10 @@ while true; do
     "${MINIFORGE_ROOT}/bin/conda" run --no-capture-output -n "${APP_ENV}"
     reliquary run-rl-worker
     --once
-    --start-window "${RELIQUARY_RL_START_WINDOW:-0}"
   )
+  if [ -n "${RELIQUARY_RL_START_WINDOW:-}" ]; then
+    cmd+=(--start-window "${RELIQUARY_RL_START_WINDOW}")
+  fi
   if [ -n "${RELIQUARY_RL_SOURCE_WINDOW:-}" ]; then
     cmd+=(--source-window "${RELIQUARY_RL_SOURCE_WINDOW}")
   fi

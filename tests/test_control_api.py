@@ -106,6 +106,7 @@ def test_metrics_endpoint_exports_platform_summary(monkeypatch) -> None:
     assert "reliquary_recent_accepted_traces 6.0" in response.text
     assert "reliquary_latest_imported_source_window 6911280.0" in response.text
     assert "reliquary_latest_rl_queue_depth 3.0" in response.text
+    assert "reliquary_rl_worker_next_window -1.0" in response.text
 
 
 def test_rl_cycle_endpoint_returns_summary(monkeypatch) -> None:
@@ -133,3 +134,29 @@ def test_rl_cycle_endpoint_returns_summary(monkeypatch) -> None:
 
     assert response.status_code == 200
     assert response.json()["training_batch_artifact"]["artifact_id"] == "batch-1"
+
+
+def test_status_endpoint_returns_platform_summary(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "reliquary.control.api.bootstrap_runtime",
+        lambda: (
+            {
+                "host_mode": "rtx6000b",
+                "node_label": "staging-node",
+                "service_version": "0.2.0",
+                "artifact_registry_backend": "local",
+                "rl_learner_backend": "trl_async_grpo_fsdp2",
+                "ray_cluster_profile": "single-node",
+                "state_root": "/tmp/reliquary-status-test",
+            },
+            _FakeRegistry(),
+        ),
+    )
+    client = TestClient(app)
+
+    response = client.get("/status")
+
+    assert response.status_code == 200
+    assert response.json()["node_label"] == "staging-node"
+    assert response.json()["latest_imported_source_window"] == 6911280
+    assert response.json()["rl_worker"]["state"] == "unknown"

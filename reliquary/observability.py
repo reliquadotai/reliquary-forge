@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from .runtime_status import build_platform_status
+
 
 def _metric_lines(name: str, value: float, *, help_text: str, labels: dict[str, str] | None = None) -> list[str]:
     label_text = ""
@@ -80,19 +82,33 @@ def _decision_counts(registry) -> tuple[float, float]:
 
 
 def build_metrics_text(cfg: dict[str, Any], registry) -> str:
+    platform_status = build_platform_status(cfg, registry)
     latest_policy = registry.latest_policy()
-    latest_benchmark = _latest_artifact(registry, "benchmark_result")
     latest_decision = _latest_artifact(registry, "policy_authority_decision")
-    latest_rl_batch = _latest_rl_training_batch(registry)
     recent_totals = _recent_scorecard_totals(registry)
     approvals, rejections = _decision_counts(registry)
 
-    benchmark_delta = -1.0
-    if latest_benchmark is not None:
-        benchmark_delta = float(latest_benchmark.get("payload", {}).get("holdout_metric", -1.0))
+    benchmark_delta = float(platform_status["latest_benchmark_delta"]) if platform_status["latest_benchmark_delta"] is not None else -1.0
     latest_policy_window = float(latest_policy.get("window_id", -1)) if latest_policy else -1.0
     latest_decision_approved = (
         1.0 if latest_decision and latest_decision.get("payload", {}).get("approved") else 0.0
+    )
+    latest_imported_window = (
+        float(platform_status["latest_imported_source_window"])
+        if platform_status["latest_imported_source_window"] is not None
+        else -1.0
+    )
+    latest_queue_depth = float(platform_status["latest_rl_queue_depth"])
+    worker_status = platform_status["rl_worker"]
+    last_success_age = (
+        float(worker_status["last_success_age_seconds"])
+        if worker_status["last_success_age_seconds"] is not None
+        else -1.0
+    )
+    last_failure_age = (
+        float(worker_status["last_failure_age_seconds"])
+        if worker_status["last_failure_age_seconds"] is not None
+        else -1.0
     )
 
     lines: list[str] = []
@@ -115,15 +131,10 @@ def build_metrics_text(cfg: dict[str, Any], registry) -> str:
                 "artifact_backend": str(cfg.get("artifact_registry_backend", "unknown")),
                 "rl_backend": str(cfg.get("rl_learner_backend", "unknown")),
                 "ray_cluster_profile": str(cfg.get("ray_cluster_profile", "unknown")),
+                "rl_worker_state": str(worker_status.get("state", "unknown")),
             },
         )
     )
-    latest_imported_window = -1.0
-    latest_queue_depth = 0.0
-    if latest_rl_batch is not None:
-        source_window_ids = latest_rl_batch.get("payload", {}).get("source_window_ids", [])
-        latest_imported_window = float(max(source_window_ids)) if source_window_ids else -1.0
-        latest_queue_depth = float(latest_rl_batch.get("payload", {}).get("training_eligible_count", 0))
     metrics = {
         "reliquary_latest_policy_window": (
             latest_policy_window,
@@ -172,6 +183,42 @@ def build_metrics_text(cfg: dict[str, Any], registry) -> str:
         "reliquary_checkpoint_rejection_count": (
             rejections,
             "Rejected checkpoint promotions recorded by policy authority.",
+        ),
+        "reliquary_rl_worker_next_window": (
+            float(worker_status["next_window"]) if worker_status["next_window"] is not None else -1.0,
+            "Next RL target window for the autonomous worker.",
+        ),
+        "reliquary_rl_worker_last_success_window": (
+            float(worker_status["last_success_window"]) if worker_status["last_success_window"] is not None else -1.0,
+            "Most recent RL window completed by the autonomous worker.",
+        ),
+        "reliquary_rl_worker_last_imported_source_window": (
+            float(worker_status["last_imported_source_window"]) if worker_status["last_imported_source_window"] is not None else -1.0,
+            "Most recent finalized inference window consumed by the RL worker.",
+        ),
+        "reliquary_rl_worker_consecutive_failures": (
+            float(worker_status["consecutive_failures"]),
+            "Current consecutive failure count for the RL worker loop.",
+        ),
+        "reliquary_rl_worker_waiting_for_data": (
+            1.0 if worker_status["waiting_for_data"] else 0.0,
+            "Whether the RL worker is currently blocked waiting for a finalized inference window.",
+        ),
+        "reliquary_rl_worker_last_decision_approved": (
+            1.0 if worker_status["last_decision_approved"] is True else 0.0,
+            "Whether the RL worker's latest promotion decision was approved.",
+        ),
+        "reliquary_rl_worker_last_holdout_metric": (
+            float(worker_status["last_holdout_metric"]) if worker_status["last_holdout_metric"] is not None else 0.0,
+            "Latest holdout metric observed by the RL worker.",
+        ),
+        "reliquary_rl_worker_last_success_age_seconds": (
+            last_success_age,
+            "Age in seconds since the RL worker last completed a successful cycle.",
+        ),
+        "reliquary_rl_worker_last_failure_age_seconds": (
+            last_failure_age,
+            "Age in seconds since the RL worker last recorded a failure.",
         ),
     }
     for name, (value, help_text) in metrics.items():

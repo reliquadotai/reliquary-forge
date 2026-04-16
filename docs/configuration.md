@@ -83,6 +83,8 @@ The satisfiability phase transition for random k-SAT is near `m/n ~ 2^k * ln(2)`
 | `RELIQUARY_RL_VLLM_ACTOR_ENDPOINTS` | `""` | Comma-separated vLLM actor endpoints used by the dense backend |
 | `RELIQUARY_NEMO_EXECUTION_MODE` | `simulate` | NeMo backend execution mode |
 
+The RL worker persists its own runtime state under `${RELIQUARY_STATE_ROOT}/runtime/rl_worker_status.json` so service restarts can resume without losing the next target window.
+
 ### Inference Import and Trainer Quorum
 
 | Variable | Default | Description |

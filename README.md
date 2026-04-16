@@ -231,8 +231,11 @@ reliquary import-inference-window [--window 0] [--source-window 6911280]
 reliquary run-rl-cycle [--window 0] [--source-window 6911280]
     Run one off-chain reasoning RL cycle from imported inference data through checkpoint gating.
 
+reliquary status
+    Print the current trainer-platform runtime summary, including RL worker state.
+
 reliquary run-rl-worker [--once] [--start-window 0]
-    Poll finalized inference windows and keep the reasoning RL lane moving autonomously.
+    Poll finalized inference windows and keep the reasoning RL lane moving autonomously, resuming from saved worker state when no explicit start window is provided.
 
 reliquary distill-train [--window 0]
     Train the reasoning student backend from the latest distillation pack.

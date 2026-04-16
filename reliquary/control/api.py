@@ -8,6 +8,7 @@ from fastapi.responses import PlainTextResponse
 from ..observability import build_metrics_text
 from ..roles.policy_authority import make_policy_authority_decision, promote_checkpoint_to_policy, publish_distill_policy
 from ..roles.trainer import import_inference_window, publish_policy as publish_rl_policy, run_reasoning_rl_cycle
+from ..runtime_status import build_platform_status
 from ..shared.bootstrap import bootstrap_runtime
 
 app = FastAPI(title="Reliquary Control Plane", version="0.2.0")
@@ -25,6 +26,12 @@ def metrics() -> PlainTextResponse:
         content=build_metrics_text(cfg, registry),
         media_type="text/plain; version=0.0.4; charset=utf-8",
     )
+
+
+@app.get("/status")
+def status() -> dict[str, Any]:
+    cfg, registry = bootstrap_runtime()
+    return build_platform_status(cfg, registry)
 
 
 @app.get("/artifacts/{artifact_type}")

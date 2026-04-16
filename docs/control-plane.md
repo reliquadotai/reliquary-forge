@@ -18,6 +18,7 @@ Default bind settings come from:
 | Endpoint | Purpose |
 |----------|---------|
 | `GET /healthz` | Liveness check |
+| `GET /status` | Current platform runtime summary, including RL worker state |
 | `GET /metrics` | Prometheus scrape endpoint for platform health, recent distillation metrics, and trainer-quorum RL metrics |
 | `GET /artifacts/{artifact_type}` | List artifacts by type, optionally filtered by `window_id` |
 | `GET /artifacts/{artifact_type}/{artifact_id}` | Fetch a single artifact |
@@ -50,3 +51,4 @@ The `/metrics` surface now includes:
 - latest imported inference window for the RL lane
 - latest RL queue depth from the most recent training batch
 - active RL backend and Ray cluster profile labels
+- RL worker next window, last success window, waiting state, and consecutive failure count

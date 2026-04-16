@@ -61,6 +61,14 @@ systemctl enable reliquary-rl-worker.service
 systemctl start reliquary-rl-worker.service
 ```
 
+Check the local trainer status with:
+
+```bash
+bash /srv/reliquary/current/deploy/runtime-health.sh
+```
+
+The RL worker keeps its cursor and recent outcome state under `/srv/reliquary/state/runtime/rl_worker_status.json`, so a service restart can resume cleanly without resetting the next target window.
+
 The control plane stays private. Reach it over SSH tunneling:
 
 ```bash
