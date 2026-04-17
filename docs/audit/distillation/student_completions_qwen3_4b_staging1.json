@@ -1,0 +1,74 @@
+[
+  {
+    "artifact_id": "2b7753c7a2fb1e71a0fcf78d50ebd59c39e3bb5781b42dda5c3bbc97798c3164",
+    "trace_artifact_id": "70efaaa23e3a4be40b5dfd532b024ef3241e45ef79395149cdd6cc5d05d0c93d",
+    "student_model": {
+      "model_name": "Qwen/Qwen3-4B-Instruct-2507",
+      "model_revision": "",
+      "endpoint_url": "local://cuda:0"
+    },
+    "miner_hotkey": "staging1-student",
+    "student_output": "To find the 7th prime number, we list prime numbers in ascending order, checking each number to ensure it has no divisors other than 1 and itself.\n\n1. 2 \u2014 prime (first prime)  \n2. 3 \u2014 prime (next prime)  \n3. 4 \u2014 not prime (divisible by 2)  \n4. 5 \u2014 prime (third prime)  \n5. 6 \u2014 not prime (divisible by 2 and 3)  \n6. 7 \u2014 prime (fourth prime)  \n7. 8 \u2014 not prime (divisible by 2)  \n8. 9 \u2014 not prime (divisible by 3)  \n9. 10 \u2014 not prime (divisible by 2 and 5)  \n10. 11 \u2014 prime (fifth prime)  \n11. 12 \u2014 not prime  \n12. 13 \u2014 prime (sixth prime)  \n13. 14 \u2014 not prime  \n14. 15 \u2014 not prime  \n15. 16 \u2014 not prime  \n16. 17 \u2014 prime (seventh prime)\n\nWe confirm that 17 is only divisible by 1 and 17, so it is prime. No primes exist between 13 and 17.\n\nThus, the 7th prime number is 17.\n\nFinal Answer: 17",
+    "student_logprobs": null,
+    "sampling_params": {
+      "temperature": 0.5,
+      "top_p": 0.9,
+      "max_tokens": 512
+    },
+    "created_at": "2026-04-17T16:22:29Z"
+  },
+  {
+    "artifact_id": "c3f86be9c2a5afe690fab607e9439a2c169c879a58c276db094c4fe2eec65dad",
+    "trace_artifact_id": "c11039b54fadf58dd8776125a859faef3cbd528d037dc7112272ee37bf90be0d",
+    "student_model": {
+      "model_name": "Qwen/Qwen3-4B-Instruct-2507",
+      "model_revision": "",
+      "endpoint_url": "local://cuda:0"
+    },
+    "miner_hotkey": "staging1-student",
+    "student_output": "The trains are moving towards each other, so their relative speed is the sum of their speeds:  \n$60 \\text{ km/h} + 80 \\text{ km/h} = 140 \\text{ km/h}$.  \nThe distance between them is 280 km.  \nThe time until they meet is:  \n$$\n\\frac{280}{140} = 2 \\text{ hours}.\n$$  \nFinal Answer: 2 hours",
+    "student_logprobs": null,
+    "sampling_params": {
+      "temperature": 0.5,
+      "top_p": 0.9,
+      "max_tokens": 512
+    },
+    "created_at": "2026-04-17T16:22:33Z"
+  },
+  {
+    "artifact_id": "cdf8937ff7c592102d0b8739549c2ced65fd6624a7bfdeb0555a57227d66abb7",
+    "trace_artifact_id": "07063e56d4a8fa77d54e263ceef582c6dbcb051e8e24958aefd14162841a97e3",
+    "student_model": {
+      "model_name": "Qwen/Qwen3-4B-Instruct-2507",
+      "model_revision": "",
+      "endpoint_url": "local://cuda:0"
+    },
+    "miner_hotkey": "staging1-student",
+    "student_output": "Deterministic verification is essential in decentralized ML inference because it guarantees that identical inputs produce identical outputs across all nodes, regardless of hardware, software, or environmental differences. In such distributed systems, non-deterministic behavior\u2014due to floating-point precision, random number generators, or timing variations\u2014can introduce inconsistent model predictions, undermining reliability and trust. Deterministic verification enables nodes to independently and reliably validate each other\u2019s computations, detecting errors or malicious deviations. This ensures model integrity, supports secure consensus, and allows for reproducible, transparent, and trustworthy inference across a decentralized network.\n\nFinal Answer: Deterministic verification ensures consistency, integrity, and trust in decentralized ML inference by guaranteeing reproducible and verifiable computations across diverse nodes, which is critical for reliable and secure model deployment.",
+    "student_logprobs": null,
+    "sampling_params": {
+      "temperature": 0.5,
+      "top_p": 0.9,
+      "max_tokens": 512
+    },
+    "created_at": "2026-04-17T16:22:41Z"
+  },
+  {
+    "artifact_id": "562ffe01bd6ec51631e9dbe675349489ba7b2a023b50dc51ff224a2782a02447",
+    "trace_artifact_id": "4816bb14b91d3ecf6c8f26252c8733e7b2daaf9acedffb8385148e2c2b1fbbc4",
+    "student_model": {
+      "model_name": "Qwen/Qwen3-4B-Instruct-2507",
+      "model_revision": "",
+      "endpoint_url": "local://cuda:0"
+    },
+    "miner_hotkey": "staging1-student",
+    "student_output": "We are given the function $ f(x) = 3x + 7 $ and told that $ f(a) = 22 $.  \n\nStep 1: Substitute $ a $ into the function:  \n$$\nf(a) = 3a + 7\n$$  \nSet this equal to 22:  \n$$\n3a + 7 = 22\n$$\n\nStep 2: Solve for $ a $  \nSubtract 7 from both sides:  \n$$\n3a = 15\n$$  \nDivide both sides by 3:  \n$$\na = 5\n$$\n\nStep 3: Verify  \nPlug $ a = 5 $ into $ f(x) $:  \n$$\nf(5) = 3(5) + 7 = 15 + 7 = 22\n$$  \nCorrect.\n\nFinal Answer: 5",
+    "student_logprobs": null,
+    "sampling_params": {
+      "temperature": 0.5,
+      "top_p": 0.9,
+      "max_tokens": 512
+    },
+    "created_at": "2026-04-17T16:22:50Z"
+  }
+]

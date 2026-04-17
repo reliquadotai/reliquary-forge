@@ -11,7 +11,8 @@ The distillation lane's pure-Python core is unit-tested (16 tests in `tests/test
 | File | Role | Model | Hardware | Tasks | Date |
 |---|---|---|---|---|---|
 | [teacher_traces_qwen3_8b.json](teacher_traces_qwen3_8b.json) | teacher | `Qwen/Qwen3-8B` (vLLM at `127.0.0.1:8001`, `gpu-memory-utilization=0.65`, `enforce-eager`) | NVIDIA RTX PRO 6000 Blackwell (dev server, `wrk-mnmhkheic6r7`) | 4 | 2026-04-17 |
-| [student_completions_qwen3_8b.json](student_completions_qwen3_8b.json) | student | same vLLM endpoint, conditioned on each teacher trace | same hardware | 4 | 2026-04-17 |
+| [student_completions_qwen3_8b.json](student_completions_qwen3_8b.json) | student (self-distill) | same vLLM endpoint, conditioned on each teacher trace | same hardware | 4 | 2026-04-17 |
+| [student_completions_qwen3_4b_staging1.json](student_completions_qwen3_4b_staging1.json) | **student (asymmetric)** | `Qwen/Qwen3-4B-Instruct-2507` via `transformers` in-process (`run_student_cycle_local`) | NVIDIA RTX PRO 6000 Blackwell (**staging1**, `wrk-j8nq3c7xn81v`) — distinct node from the teacher | 4 | 2026-04-17 |
 
 ## Run summary (2026-04-17)
 
@@ -36,6 +37,17 @@ Trace lengths: 2065 – 3681 characters each; all fit inside `max_tokens=2048`. 
 | t4 | `... Final Answer: $ \boxed{5} $` | ✓ |
 
 Using the same model family as teacher and student is a self-distillation configuration used to exercise the artifact pipeline end-to-end; production substitutes a smaller student (e.g. Qwen3-4B) on a different GPU.
+
+**Asymmetric run (2026-04-17, dedicated smaller student on a separate node):** Qwen3-4B-Instruct-2507 loaded in-process via `transformers` on staging1 Blackwell (`wrk-j8nq3c7xn81v`), conditioned on the same teacher trace JSON as above. All 4 student completions produced correct answers; all 4 provenance bindings resolve against the teacher catalog.
+
+| Task | Asymmetric student final answer | Bound |
+|---|---|---|
+| t1 | `... Final Answer: 17` | ✓ |
+| t2 | `... = 2 hours. Final Answer: 2 hours` | ✓ |
+| t3 | `... critical for reliable and secure model deployment.` | ✓ |
+| t4 | `f(5) = 22 Correct. Final Answer: 5` | ✓ |
+
+This exercises the configuration Tier 3 Epic 1 actually ships to production: teacher on a larger node produces reasoning traces; smaller student on commodity hardware consumes them. The artifact-pipeline code path is the same as the self-distillation run (`StudentCompletionArtifact` shape, `trace_artifact_id` binding, `miner_hotkey` tagging); only the student-side runtime changes (`run_student_cycle_local` instead of `run_student_cycle`).
 
 ## Reproducing
 
@@ -63,6 +75,7 @@ PY
 
 ## Open items
 
-- **Dedicated student on a different GPU**: this run reuses the dev-server Qwen3-8B for both sides (self-distillation); it proves the pipeline end-to-end but a production measurement needs Qwen3-4B on a Blackwell staging host. Bootstrap pending vLLM or transformers-serve on that host.
 - **Larger task batch**: 4 tasks is a pilot. Production runs use ≥ 32 per window (matching the nine-stage verifier's CHALLENGE_K).
+- **Contamination benchmark expansion**: `default_benchmark_ngrams()` ships a small hardcoded seed set. Production substitutes a full MMLU / GSM8K / HumanEval ngram store.
 - **Final-answer extraction robustness**: the updated regex correctly handles Qwen3's `<think>...</think>` format. If other teacher families (Llama-3, Mistral) emit different anchors, add patterns to `DEFAULT_FINAL_ANSWER_REGEX` in `lane.py`.
+- **Teacher catalog onchain commitment**: the teacher model allowlist needs to land as a `commit_policy_metadata` call once SN3 (Forge) ownership lands. Uses the existing chain adapter primitive from the reliquary-inference Tier 1 Epic 5.
