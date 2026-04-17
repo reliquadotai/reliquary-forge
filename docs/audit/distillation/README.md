@@ -8,9 +8,10 @@ The distillation lane's pure-Python core is unit-tested (16 tests in `tests/test
 
 ## Committed runs
 
-| File | Teacher | Hardware | Tasks | Date |
-|---|---|---|---|---|
-| [teacher_traces_qwen3_8b.json](teacher_traces_qwen3_8b.json) | `Qwen/Qwen3-8B` (vLLM at `127.0.0.1:8001`, `gpu-memory-utilization=0.65`, `enforce-eager`) | NVIDIA RTX PRO 6000 Blackwell (dev server, `wrk-mnmhkheic6r7`) | 4 (2 math, 1 reasoning, 1 algebra) | 2026-04-17 |
+| File | Role | Model | Hardware | Tasks | Date |
+|---|---|---|---|---|---|
+| [teacher_traces_qwen3_8b.json](teacher_traces_qwen3_8b.json) | teacher | `Qwen/Qwen3-8B` (vLLM at `127.0.0.1:8001`, `gpu-memory-utilization=0.65`, `enforce-eager`) | NVIDIA RTX PRO 6000 Blackwell (dev server, `wrk-mnmhkheic6r7`) | 4 | 2026-04-17 |
+| [student_completions_qwen3_8b.json](student_completions_qwen3_8b.json) | student | same vLLM endpoint, conditioned on each teacher trace | same hardware | 4 | 2026-04-17 |
 
 ## Run summary (2026-04-17)
 
@@ -24,6 +25,17 @@ Sampling params: `temperature=0.5, top_p=0.9, max_tokens=2048`. All four traces 
 | t4 | "f(x) = 3x+7, f(a)=22" | `$ \boxed{5} $` | ✓ |
 
 Trace lengths: 2065 – 3681 characters each; all fit inside `max_tokens=2048`. Per-token logprobs captured from vLLM and stored in the artifact so downstream learners can consume them without re-running the teacher.
+
+**Student cycle (2026-04-17, same session):** same Qwen3-8B endpoint served as the student, conditioned on each teacher trace via `run_student_cycle`. All 4 student completions carry `trace_artifact_id` pointing to the corresponding teacher artifact (provenance binding verified). Student answers:
+
+| Task | Student final-answer tail | Bound to teacher |
+|---|---|---|
+| t1 | `... Final Answer: 17` | ✓ |
+| t2 | `... = 2 hours. Final Answer: 2 hours.` | ✓ |
+| t3 | `... essential for accurate model outputs and secure collaboration.` | ✓ |
+| t4 | `... Final Answer: $ \boxed{5} $` | ✓ |
+
+Using the same model family as teacher and student is a self-distillation configuration used to exercise the artifact pipeline end-to-end; production substitutes a smaller student (e.g. Qwen3-4B) on a different GPU.
 
 ## Reproducing
 
@@ -51,6 +63,6 @@ PY
 
 ## Open items
 
-- **Student cycle**: not included in this run; the lane includes `run_student_cycle` that takes a list of teacher traces and produces conditioned student completions. A follow-up run will wire Qwen3-4B on a Blackwell staging host (staging1 or staging2) as the student endpoint once a vLLM or transformers-based inference server is configured there.
+- **Dedicated student on a different GPU**: this run reuses the dev-server Qwen3-8B for both sides (self-distillation); it proves the pipeline end-to-end but a production measurement needs Qwen3-4B on a Blackwell staging host. Bootstrap pending vLLM or transformers-serve on that host.
 - **Larger task batch**: 4 tasks is a pilot. Production runs use ≥ 32 per window (matching the nine-stage verifier's CHALLENGE_K).
 - **Final-answer extraction robustness**: the updated regex correctly handles Qwen3's `<think>...</think>` format. If other teacher families (Llama-3, Mistral) emit different anchors, add patterns to `DEFAULT_FINAL_ANSWER_REGEX` in `lane.py`.
