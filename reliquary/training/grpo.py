@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import time
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
 from ..utils.json_io import write_json
 from ..utils.modeling import load_model_bundle, save_model_bundle
+from .metrics import TrainingMetrics
 
 
 def build_grpo_groups(verdicts: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -69,6 +71,25 @@ def _sequence_logprob(model, full_token_ids: list[int], prompt_len: int, device:
     return selected.sum()
 
 
+def _gradient_norm(model) -> float:
+    import torch
+
+    total_sq = 0.0
+    for parameter in model.parameters():
+        if parameter.grad is None:
+            continue
+        total_sq += float(parameter.grad.detach().pow(2).sum().item())
+    return total_sq**0.5
+
+
+def _advantage_variance(group: dict[str, Any]) -> float:
+    advantages = [float(sample["advantage"]) for sample in group["samples"]]
+    if not advantages:
+        return 0.0
+    mean = sum(advantages) / len(advantages)
+    return sum((adv - mean) ** 2 for adv in advantages) / len(advantages)
+
+
 def train_grpo_checkpoint(
     model_ref: str,
     groups: list[dict[str, Any]],
@@ -78,6 +99,9 @@ def train_grpo_checkpoint(
     clip_eps: float,
     kl_coef: float,
     epochs: int,
+    *,
+    metrics: TrainingMetrics | None = None,
+    run_id: str | None = None,
 ) -> dict[str, Any]:
     import torch
 
@@ -93,15 +117,18 @@ def train_grpo_checkpoint(
 
     step_losses: list[float] = []
     accepted_samples = sum(len(group["samples"]) for group in groups)
+    emit_metrics = metrics is not None and run_id is not None
 
     for _ in range(max(epochs, 1)):
         for group in groups:
+            group_adv_variance = _advantage_variance(group)
             for sample in group["samples"]:
                 advantage = float(sample["advantage"])
                 if abs(advantage) < 1e-8:
                     continue
                 prompt_len = len(sample["prompt_token_ids"])
                 old_sum = torch.tensor(sample["old_sum_logprob"], dtype=torch.float32, device=device)
+                step_start = time.perf_counter()
                 current_sum = _sequence_logprob(
                     model=model,
                     full_token_ids=sample["full_token_ids"],
@@ -126,8 +153,23 @@ def train_grpo_checkpoint(
 
                 optimizer.zero_grad()
                 loss.backward()
+                grad_norm = _gradient_norm(model) if emit_metrics else 0.0
                 optimizer.step()
-                step_losses.append(float(loss.detach().cpu()))
+                step_seconds = time.perf_counter() - step_start
+                loss_val = float(loss.detach().cpu())
+                kl_val = float(kl_term.detach().cpu())
+                step_losses.append(loss_val)
+
+                if emit_metrics:
+                    metrics.record_step(
+                        run_id,  # type: ignore[arg-type]
+                        loss=loss_val,
+                        grad_norm=grad_norm,
+                        advantage_variance=group_adv_variance,
+                        kl=kl_val,
+                        step_seconds=step_seconds,
+                        samples_accepted=1,
+                    )
 
     save_model_bundle(model, tokenizer, output_dir)
     summary = {
