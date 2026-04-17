@@ -53,6 +53,9 @@ tracing = [
 wandb = [
     "wandb>=0.16.0",
 ]
+sandbox = [
+    "RestrictedPython>=7.0",
+]
 
 [project.scripts]
 reliquary = "reliquary.cli:main"
