@@ -355,6 +355,104 @@ def _iso_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
+def run_student_cycle_local(
+    hf_model_name: str,
+    traces: Iterable[TeacherTraceArtifact],
+    *,
+    miner_hotkey: str,
+    device: str = "cuda:0",
+    dtype: str = "bfloat16",
+    sampling_params: dict | None = None,
+) -> list[StudentCompletionArtifact]:
+    """Run the student cycle against a locally-loaded HuggingFace model.
+
+    Unlike :func:`run_student_cycle`, this path does not require an HTTP
+    endpoint. It loads the model in-process with ``transformers`` and runs
+    inference directly. Intended for small students (Qwen3-4B class) where
+    the overhead of running a vLLM server per validator is not justified,
+    and for the asymmetric-hardware distillation configuration where a
+    Blackwell staging node produces student completions conditioned on
+    teacher traces sourced from a separate host.
+    """
+    import torch
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+
+    sampling_params = sampling_params or {"temperature": 0.7, "top_p": 0.9, "max_tokens": 256}
+    dtype_map = {
+        "bfloat16": torch.bfloat16,
+        "bf16": torch.bfloat16,
+        "float16": torch.float16,
+        "fp16": torch.float16,
+        "float32": torch.float32,
+        "fp32": torch.float32,
+    }
+    torch_dtype = dtype_map.get(dtype, torch.bfloat16)
+    tokenizer = AutoTokenizer.from_pretrained(hf_model_name)
+    model = AutoModelForCausalLM.from_pretrained(
+        hf_model_name,
+        torch_dtype=torch_dtype,
+    ).to(device)
+    model.eval()
+    if tokenizer.pad_token_id is None:
+        tokenizer.pad_token_id = tokenizer.eos_token_id
+
+    student_ref = StudentModelRef(
+        model_name=hf_model_name,
+        endpoint_url=f"local://{device}",
+    )
+
+    out: list[StudentCompletionArtifact] = []
+    for trace in traces:
+        if trace.contamination_flag:
+            continue
+        conditioning = (
+            f"{trace.task.prompt}\n\n"
+            f"Reference reasoning (for guidance; follow its approach):\n"
+            f"{trace.reasoning_trace}\n\n"
+            "Now produce your own concise answer following the same approach. "
+            "End with `Final Answer: <answer>`."
+        )
+        try:
+            prompt_text = tokenizer.apply_chat_template(
+                [{"role": "user", "content": conditioning}],
+                tokenize=False,
+                add_generation_prompt=True,
+            )
+        except Exception:  # models without a chat template
+            prompt_text = conditioning
+        inputs = tokenizer(prompt_text, return_tensors="pt").to(device)
+        with torch.inference_mode():
+            generated = model.generate(
+                **inputs,
+                max_new_tokens=int(sampling_params.get("max_tokens", 256)),
+                temperature=float(sampling_params.get("temperature", 0.7)),
+                top_p=float(sampling_params.get("top_p", 0.9)),
+                do_sample=True,
+                pad_token_id=tokenizer.pad_token_id,
+            )
+        completion_ids = generated[0][inputs["input_ids"].shape[1]:]
+        output = tokenizer.decode(completion_ids, skip_special_tokens=True)
+        payload = {
+            "student": asdict(student_ref),
+            "parent": trace.artifact_id,
+            "output": output,
+        }
+        artifact_id = _artifact_id(payload)
+        out.append(
+            StudentCompletionArtifact(
+                artifact_id=artifact_id,
+                trace_artifact_id=trace.artifact_id,
+                student_model=student_ref,
+                miner_hotkey=miner_hotkey,
+                student_output=output,
+                student_logprobs=None,
+                sampling_params=dict(sampling_params),
+                created_at=_iso_now(),
+            )
+        )
+    return out
+
+
 def default_benchmark_ngrams() -> set[str]:
     """Small hardcoded benchmark ngram set for initial contamination screening.
 
