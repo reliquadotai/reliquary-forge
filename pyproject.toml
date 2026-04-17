@@ -56,6 +56,9 @@ wandb = [
 sandbox = [
     "RestrictedPython>=7.0",
 ]
+protocol = [
+    "reliquary-protocol>=0.1.0",
+]
 
 [project.scripts]
 reliquary = "reliquary.cli:main"
