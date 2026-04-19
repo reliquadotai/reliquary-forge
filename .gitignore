@@ -12,6 +12,8 @@ htmlcov/
 
 # Virtualenvs and local tooling
 .env
+.env.local
+.env.*.local
 .venv/
 venv/
 .python-version
