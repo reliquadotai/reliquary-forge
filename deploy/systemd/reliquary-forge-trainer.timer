@@ -1,0 +1,21 @@
+[Unit]
+Description=Periodic Reliquary Forge training cycle
+Requires=reliquary-forge-trainer.service
+
+[Timer]
+# Fire once at 3 min post-boot (catches any rollouts that accumulated
+# while the Forge host was down) then every 60 minutes thereafter —
+# Ledger window cadence is 30 blocks × 12s = 6 min, so 60 min = 10
+# windows of rollout data per training cycle. Enough new signal each
+# run; not so frequent we DoS R2 with parallel scans.
+OnBootSec=3min
+OnUnitActiveSec=60min
+# Add jitter so multiple Forge hosts (if scaled out later) don't all
+# hit R2 at the same instant.
+RandomizedDelaySec=120
+# Persist last-run time across reboots so a long downtime doesn't
+# trigger a burst-fire on boot.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

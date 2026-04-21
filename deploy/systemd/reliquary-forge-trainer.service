@@ -1,0 +1,28 @@
+[Unit]
+Description=Reliquary Forge one-shot training cycle
+After=network-online.target
+Wants=network-online.target
+# Don't start a new cycle while the previous one is still running — the
+# timer's OnUnitActiveSec works off inactive transitions, but a stuck
+# cycle (e.g. R2 timeout) shouldn't stack.
+ConditionPathExists=/opt/reliquary-repos/reliquary/scripts/run_forge_train_live.py
+ConditionPathExists=/opt/reliquary-secrets/r2-cf-api-token
+ConditionPathExists=/opt/reliquary-secrets/signing-secret
+
+[Service]
+Type=oneshot
+User=root
+# Keep the training under a fresh stdin/stdout — the wrapper handles
+# redirection into /opt/reliquary-state/logs/forge-training.log.
+ExecStart=/opt/reliquary-deploy/run-forge-training-cycle.sh
+# Single-run fail tolerance; systemd + timer re-fires on next tick.
+# Don't Restart=on-failure or we re-train immediately on a transient R2 blip.
+Restart=no
+# Generous runtime: 20 LoRA steps on Qwen2.5-3B takes ~10s on Blackwell,
+# but the first run also does an R2 list across a few hundred objects.
+# 10 min gives headroom for up to a 5 min pathological R2 scan.
+TimeoutStartSec=600
+# Emit a failure metric to the local Prometheus exporter if systemd sees
+# a non-zero exit (distinct from the --min-new-pairs no-op path which
+# exits 0 deliberately).
+# (Wired externally via the node_exporter textfile collector.)

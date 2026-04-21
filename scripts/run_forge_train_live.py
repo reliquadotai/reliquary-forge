@@ -84,9 +84,22 @@ def log(msg: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def pull_training_pairs(backend: R2ObjectBackend) -> list[tuple[str, str]]:
-    """Fetch + join task_batches (for prompts) with verdict_bundles + completion_bundles
-    (for accepted completions). Returns a list of (prompt, completion) tuples."""
+def pull_training_pairs(
+    backend: R2ObjectBackend,
+    *,
+    min_window: int,
+) -> tuple[list[tuple[str, str]], list[int], list[str]]:
+    """Fetch + join task_batches with verdict_bundles + completion_bundles.
+
+    Returns ``(pairs, consumed_windows, consumed_keys)``:
+      - pairs: list of (prompt, completion) tuples for SFT
+      - consumed_windows: sorted list of window_ids whose rollouts fed the set
+      - consumed_keys: R2 keys of the rollout_bundle / completion_bundle
+        artifacts the training pulled from, for the attestation chain
+
+    Only considers data with ``window_id >= min_window`` — lets continuous
+    Forge runs skip already-trained-on data.
+    """
 
     # 1. Task batches → {task_id: prompt}
     tb_keys = backend.list("task_batches/")
@@ -103,7 +116,7 @@ def pull_training_pairs(backend: R2ObjectBackend) -> list[tuple[str, str]]:
             continue
         tb_checked += 1
         window_id = int(tb["payload"].get("window_id", 0))
-        if window_id < MIN_LIVE_WINDOW:
+        if window_id < min_window:
             continue
         for task in tb["payload"].get("tasks", []):
             tid = task.get("task_id")
@@ -121,7 +134,7 @@ def pull_training_pairs(backend: R2ObjectBackend) -> list[tuple[str, str]]:
             window_id = int(key.split("/")[1].split("-")[1])
         except (IndexError, ValueError):
             continue
-        if window_id < MIN_LIVE_WINDOW:
+        if window_id < min_window:
             continue
         raw = backend.get(key)
         if raw is None:
@@ -139,12 +152,14 @@ def pull_training_pairs(backend: R2ObjectBackend) -> list[tuple[str, str]]:
     # 3. Completion bundles → (prompt, completion) pairs where accepted
     cb_keys = [k for k in backend.list("completion_bundles/") if k.endswith(".json.gz")]
     pairs: list[tuple[str, str]] = []
+    consumed_windows: set[int] = set()
+    consumed_keys: list[str] = []
     for key in cb_keys:
         try:
             window_id = int(key.split("/")[1].split("-")[1])
         except (IndexError, ValueError):
             continue
-        if window_id < MIN_LIVE_WINDOW:
+        if window_id < min_window:
             continue
         raw = backend.get(key)
         if raw is None:
@@ -153,6 +168,7 @@ def pull_training_pairs(backend: R2ObjectBackend) -> list[tuple[str, str]]:
             comps = json.loads(gzip.decompress(raw).decode())
         except Exception:
             continue
+        used_any = False
         for c in comps:
             if c["artifact_id"] not in accepted_completion_ids:
                 continue
@@ -162,8 +178,15 @@ def pull_training_pairs(backend: R2ObjectBackend) -> list[tuple[str, str]]:
             if not prompt or not completion:
                 continue
             pairs.append((prompt, completion))
-    log(f"  completion_bundles scanned={len(cb_keys)} training_pairs={len(pairs)}")
-    return pairs
+            used_any = True
+        if used_any:
+            consumed_windows.add(window_id)
+            consumed_keys.append(key)
+    log(
+        f"  completion_bundles scanned={len(cb_keys)} training_pairs={len(pairs)} "
+        f"consumed_windows={len(consumed_windows)}"
+    )
+    return pairs, sorted(consumed_windows), consumed_keys
 
 
 # ---------------------------------------------------------------------------
@@ -254,7 +277,49 @@ def run_sft_lora(
 # ---------------------------------------------------------------------------
 
 
+def _load_state(path: str) -> dict:
+    try:
+        return json.load(open(path))
+    except FileNotFoundError:
+        return {}
+
+
+def _save_state(path: str, state: dict) -> None:
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(state, f, indent=2, sort_keys=True)
+    os.replace(tmp, path)
+
+
 def main() -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Forge SFT-LoRA cycle against live mesh rollouts")
+    parser.add_argument(
+        "--state-file",
+        default="/opt/reliquary-state/forge-trainer-state.json",
+        help="Persistent state (tracks last_trained_window so continuous runs don't re-train on stale data)",
+    )
+    parser.add_argument(
+        "--min-new-pairs",
+        type=int,
+        default=16,
+        help="Skip the cycle if fewer than this many new training pairs are available since the last run",
+    )
+    parser.add_argument(
+        "--effective-at-offset-blocks",
+        type=int,
+        default=60,
+        help="Blocks past current_window to schedule the hot-swap at",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Re-train on all post-v5 data regardless of state file",
+    )
+    args = parser.parse_args()
+
     r2_token = open("/opt/reliquary-secrets/r2-cf-api-token").read().strip()
     signing_secret = open("/opt/reliquary-secrets/signing-secret").read().strip()
     backend = R2ObjectBackend(
@@ -264,13 +329,25 @@ def main() -> int:
         public_url="https://pub-954f95c7d2f3478886c8a8ff7a4946e0.r2.dev",
     )
 
-    log(f"building training set from R2 (window >= {MIN_LIVE_WINDOW})")
-    pairs = pull_training_pairs(backend)
-    if len(pairs) < 5:
-        log(f"FATAL: only {len(pairs)} training pairs available — need more live windows")
-        return 2
+    state = _load_state(args.state_file)
+    if args.force:
+        last_trained_window = MIN_LIVE_WINDOW
+        log(f"--force: re-training on all data from window {last_trained_window}")
+    else:
+        last_trained_window = int(state.get("last_trained_window", MIN_LIVE_WINDOW))
+    min_window_for_training = max(last_trained_window, MIN_LIVE_WINDOW)
+
+    log(f"building training set from R2 (window >= {min_window_for_training})")
+    pairs, consumed_windows, consumed_keys = pull_training_pairs(
+        backend, min_window=min_window_for_training
+    )
+    if len(pairs) < args.min_new_pairs:
+        log(
+            f"only {len(pairs)} training pairs since window {min_window_for_training} — "
+            f"need {args.min_new_pairs}. Skipping cycle (exit 0, not an error)."
+        )
+        return 0
     log(f"  training set: {len(pairs)} pairs")
-    # Sample one
     sp, sc = pairs[0]
     log(f"  sample prompt (first 80): {sp[:80]!r}")
     log(f"  sample completion (first 80): {sc[:80]!r}")
@@ -305,7 +382,6 @@ def main() -> int:
     }
     assert len(post_params) == len(target_names)
 
-    # Sanity: show a delta magnitude
     sample_name = target_names[0]
     d = (post_params[sample_name] - pre_params[sample_name]).abs().mean().item()
     log(f"  mean abs delta on {sample_name}: {d:.6f}")
@@ -319,7 +395,7 @@ def main() -> int:
     subt = bt.subtensor("test")
     current_block = subt.get_current_block()
     current_window = (current_block // 30) * 30
-    effective_at = current_window + 60
+    effective_at = current_window + int(args.effective_at_offset_blocks)
 
     log(f"publishing delta bundle to checkpoints/{RUN_ID}/{current_window}/")
     manifest = publish_bundle(
@@ -328,6 +404,10 @@ def main() -> int:
 
     log("publishing CheckpointAttestation + PolicyCommitment")
     signer = make_hmac_authority(POLICY_AUTHORITY_HOTKEY, signing_secret)
+    # Attestation records which Ledger rollout windows actually fed this
+    # training cycle — closes the provenance chain end-to-end so any third
+    # party can follow a checkpoint back to the exact mesh-signed rollouts
+    # that shaped it.
     pub = publish_attestation(
         backend=backend,
         signer=signer,
@@ -335,14 +415,35 @@ def main() -> int:
         inference_netuid=INFERENCE_NETUID,
         checkpoint_manifest=manifest,
         base_snapshot_window_id=0,
-        consumed_rollout_windows=[],  # future: pass the actual trained-on windows
-        consumed_rollout_keys=[],
+        consumed_rollout_windows=consumed_windows,
+        consumed_rollout_keys=consumed_keys,
         effective_at_ledger_window=effective_at,
     )
     log(f"  attestation_key: {pub.attestation_key}")
     log(f"  commitment_key:  {pub.commitment_key}")
     log(f"  smoke_hash:      {pub.smoke_hash_hex}")
     log(f"  effective_at_ledger_window: {effective_at} (current: {current_window})")
+    log(f"  consumed_rollout_windows: {len(consumed_windows)} ({consumed_windows[:5]}…)")
+
+    # Persist state so the next continuous run skips already-trained data.
+    # Advance past the highest consumed window so we only pull new rollouts.
+    if consumed_windows:
+        state["last_trained_window"] = int(max(consumed_windows)) + 1
+    state.setdefault("runs", []).append(
+        {
+            "run_id": RUN_ID,
+            "at_window": current_window,
+            "effective_at_window": effective_at,
+            "merkle_root": bundle.merkle_root_hex,
+            "smoke_hash": pub.smoke_hash_hex,
+            "pairs": len(pairs),
+            "consumed_windows": consumed_windows,
+        }
+    )
+    # Cap run history length.
+    state["runs"] = state["runs"][-20:]
+    _save_state(args.state_file, state)
+    log(f"  state written: last_trained_window={state.get('last_trained_window')}")
 
     print("SUMMARY:", flush=True)
     print(json.dumps({
