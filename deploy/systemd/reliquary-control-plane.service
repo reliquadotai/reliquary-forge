@@ -6,9 +6,16 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=reliquary
-WorkingDirectory=/srv/reliquary/current
+# WorkingDirectory must be writable — the control-plane creates `data/metadata`
+# on startup. Repo checkout (/srv/reliquary/current) is read-only via symlinks
+# on persistent-volume deployments, so default to the state dir.
+WorkingDirectory=/srv/reliquary/state
 EnvironmentFile=/srv/reliquary/state/reliquary.env
-ExecStart=/bin/bash -lc 'exec /opt/miniforge/bin/conda run --no-capture-output -n reliquary-app reliquary serve-control-plane --host "$RELIQUARY_API_BIND" --port "$RELIQUARY_API_PORT"'
+# Invoke the venv binary directly. Avoids the `bash -lc` → conda layer that
+# masked EnvironmentFile variables on systemd v255+. Operators using a conda
+# layout can override ExecStart via a drop-in at
+# /etc/systemd/system/reliquary-control-plane.service.d/override.conf.
+ExecStart=/opt/reliquary-venv/bin/reliquary serve-control-plane --host ${RELIQUARY_API_BIND} --port ${RELIQUARY_API_PORT}
 Restart=always
 RestartSec=5
 
