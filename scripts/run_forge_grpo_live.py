@@ -130,10 +130,36 @@ class RolloutGroup:
     rollouts: list[Rollout] = field(default_factory=list)
 
 
+# Cursor file format (stored under the forge state dir):
+#   {
+#     "scorecards": {"<r2_key>": {"window_id": int, "task_prompts_present": bool, "in_zone_entries": [...], "seen_at": "iso"}},
+#     "task_batches": {"<r2_key>": {"window_id": int, "seen_at": "iso"}},
+#     "completion_bundles": {"<r2_key>": {"window_id": int, "miner_id": str, "seen_at": "iso"}},
+#   }
+# The cursor lets each cycle do O(new_keys) gets instead of O(all_keys).
+FORGE_CURSOR_PATH_DEFAULT = "/opt/reliquary-state/forge-grpo-cursor.json"
+
+
+def _load_cursor(path: str) -> dict:
+    try:
+        return json.load(open(path))
+    except FileNotFoundError:
+        return {}
+
+
+def _save_cursor(path: str, cursor: dict) -> None:
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(cursor, f)
+    os.replace(tmp, path)
+
+
 def pull_training_groups(
     backend: R2ObjectBackend,
     *,
     min_window: int,
+    cursor_path: str = FORGE_CURSOR_PATH_DEFAULT,
 ) -> tuple[list[RolloutGroup], list[int], list[str]]:
     """Fetch ``(miner, task)`` rollout groups that passed the validator's
     zone filter (σ ≥ 0.43 for binary rewards).
@@ -142,15 +168,34 @@ def pull_training_groups(
     where ``in_zone == True``, then join to the matching task prompt (from
     task_batches) and completion rollouts (from completion_bundles).
 
+    Uses a local cursor file so each cycle only fetches NEW R2 keys;
+    previously-seen keys are served from the cursor's memoised summary.
+    This takes per-cycle time from ~10 min (full 700+ scorecard rescan)
+    to ~30 s in steady state.
+
     Returns ``(groups, consumed_windows, consumed_keys)`` — same shape
     as the SFT pull_training_pairs helper so the attestation step can
     use it without modification.
     """
+    cursor = _load_cursor(cursor_path)
+    cursor.setdefault("scorecards", {})
+    cursor.setdefault("task_batches", {})
+    cursor.setdefault("completion_bundles", {})
+    iso_now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
     # 1. Task batches → {task_id: (prompt, window_id)}
     tb_keys = backend.list("task_batches/")
     task_index: dict[str, tuple[str, int]] = {}
     tb_errors = 0
+    tb_new = 0
     for key in tb_keys:
+        entry = cursor["task_batches"].get(key)
+        if entry is not None:
+            # Memoised: the cursor carries the tasks list so we don't
+            # refetch. Rebuild task_index from the cached prompts.
+            for tid, prompt in (entry.get("tasks") or {}).items():
+                task_index[tid] = (prompt, int(entry["window_id"]))
+            continue
         try:
             raw = backend.get(key)
         except Exception:
@@ -163,15 +208,22 @@ def pull_training_groups(
         except Exception:
             continue
         window_id = int(tb["payload"].get("window_id", 0))
-        if window_id < min_window:
-            continue
+        cached_tasks: dict[str, str] = {}
         for task in tb["payload"].get("tasks", []):
             tid = task.get("task_id")
             prompt = task.get("prompt", "")
             if tid and prompt:
-                task_index[tid] = (prompt, window_id)
+                cached_tasks[tid] = prompt
+                if window_id >= min_window:
+                    task_index[tid] = (prompt, window_id)
+        cursor["task_batches"][key] = {
+            "window_id": window_id,
+            "tasks": cached_tasks,
+            "seen_at": iso_now,
+        }
+        tb_new += 1
     log(
-        f"  task_batches scanned={len(tb_keys)} skipped_errors={tb_errors} "
+        f"  task_batches scanned={len(tb_keys)} new={tb_new} skipped_errors={tb_errors} "
         f"prompts_indexed={len(task_index)}"
     )
 
@@ -184,7 +236,19 @@ def pull_training_groups(
     in_zone_keys: set[tuple[str, str]] = set()
     consumed_windows: set[int] = set()
     sc_errors = 0
+    sc_new = 0
     for key in sc_keys:
+        entry = cursor["scorecards"].get(key)
+        if entry is not None:
+            # Memoised: use the cached zone_filter summary to rebuild
+            # in-zone keys without refetching the scorecard.
+            w = int(entry["window_id"])
+            if w >= min_window:
+                for k in entry.get("in_zone_keys", []):
+                    in_zone_keys.add(tuple(k))
+                if entry.get("in_zone_keys"):
+                    consumed_windows.add(w)
+            continue
         try:
             raw = backend.get(key)
         except Exception as exc:
@@ -199,34 +263,56 @@ def pull_training_groups(
         except Exception:
             continue
         window_id = int(sc["payload"].get("window_id", 0))
-        if window_id < min_window:
-            continue
         zone = sc["payload"].get("window_metrics", {}).get("zone_filter") or {}
+        cached_in_zone: list[list[str]] = []
         for group in zone.get("groups", []):
             if not group.get("in_zone"):
                 continue
             miner = str(group.get("miner_id") or "")
             task_id = str(group.get("task_id") or "")
             if miner and task_id:
-                in_zone_keys.add((miner, task_id))
-                consumed_windows.add(window_id)
+                cached_in_zone.append([miner, task_id])
+                if window_id >= min_window:
+                    in_zone_keys.add((miner, task_id))
+                    consumed_windows.add(window_id)
+        cursor["scorecards"][key] = {
+            "window_id": window_id,
+            "in_zone_keys": cached_in_zone,
+            "seen_at": iso_now,
+        }
+        sc_new += 1
     log(
-        f"  scorecards scanned={len(sc_keys)} skipped_errors={sc_errors} "
+        f"  scorecards scanned={len(sc_keys)} new={sc_new} skipped_errors={sc_errors} "
         f"in_zone_groups={len(in_zone_keys)} consumed_windows={len(consumed_windows)}"
     )
 
-    # 3. Completion bundles → rollouts, grouped by (miner, task) where in-zone
+    # 3. Completion bundles → rollouts, grouped by (miner, task) where in-zone.
+    # Huge perf optimisation: only fetch bundles whose window has at least
+    # one in-zone group. Bundles without any in-zone group can't contribute
+    # to training, so skipping them saves the biggest single category of
+    # R2 gets. Also memoise `used` state so post-training we don't
+    # reprocess bundles we already pulled rollouts from.
     cb_keys = [k for k in backend.list("completion_bundles/") if k.endswith(".json.gz")]
     bucket: dict[tuple[str, str], list[Rollout]] = defaultdict(list)
     group_window: dict[tuple[str, str], int] = {}
     consumed_keys: list[str] = []
     cb_errors = 0
+    cb_new = 0
     for key in cb_keys:
         try:
             window_id = int(key.split("/")[1].split("-")[1])
         except (IndexError, ValueError):
             continue
-        if window_id < min_window:
+        if window_id < min_window or window_id not in consumed_windows:
+            # Either below horizon OR this window had no in-zone groups →
+            # no rollouts worth fetching. Record-and-skip.
+            cursor["completion_bundles"].setdefault(
+                key, {"window_id": window_id, "seen_at": iso_now, "used": False}
+            )
+            continue
+        entry = cursor["completion_bundles"].get(key)
+        if entry is not None and entry.get("used") is True:
+            # Already consumed in a prior cycle — nothing new here.
             continue
         try:
             raw = backend.get(key)
@@ -239,6 +325,7 @@ def pull_training_groups(
             comps = json.loads(gzip.decompress(raw).decode())
         except Exception:
             continue
+        cb_new += 1
         used_any = False
         for c in comps:
             payload = c["payload"]
@@ -262,6 +349,11 @@ def pull_training_groups(
             used_any = True
         if used_any:
             consumed_keys.append(key)
+        cursor["completion_bundles"][key] = {
+            "window_id": window_id,
+            "seen_at": iso_now,
+            "used": used_any,
+        }
 
     groups: list[RolloutGroup] = []
     for (miner, task_id), rollouts in bucket.items():
@@ -281,10 +373,23 @@ def pull_training_groups(
             )
         )
     log(
-        f"  completion_bundles scanned={len(cb_keys)} skipped_errors={cb_errors} "
+        f"  completion_bundles scanned={len(cb_keys)} new_fetched={cb_new} skipped_errors={cb_errors} "
         f"assembled_groups={len(groups)} "
         f"total_rollouts={sum(len(g.rollouts) for g in groups)}"
     )
+    # Save the cursor so the next cycle can skip keys we've already seen.
+    # Safe to fail: the worst outcome is a slower next cycle, not a
+    # correctness issue (the cursor is purely a perf optimisation).
+    try:
+        _save_cursor(cursor_path, cursor)
+        cursor_size = (
+            len(cursor.get("scorecards") or {})
+            + len(cursor.get("task_batches") or {})
+            + len(cursor.get("completion_bundles") or {})
+        )
+        log(f"  cursor written: {cursor_size} keys memoised at {cursor_path}")
+    except Exception as exc:
+        log(f"  cursor write failed (non-fatal): {type(exc).__name__}: {exc}")
     return groups, sorted(consumed_windows), consumed_keys
 
 
@@ -533,6 +638,15 @@ def main() -> int:
         ),
     )
     parser.add_argument(
+        "--cursor-path",
+        default=FORGE_CURSOR_PATH_DEFAULT,
+        help=(
+            "Local JSON cursor memoising (r2_key → summary) for already-"
+            "scanned task_batches / scorecards / completion_bundles. Cuts "
+            "per-cycle R2 get count from ~900 to ~10 in steady state."
+        ),
+    )
+    parser.add_argument(
         "--force",
         action="store_true",
         help="Re-train on all post-v5 data regardless of state file.",
@@ -558,7 +672,7 @@ def main() -> int:
 
     log(f"building zone-filtered group set from R2 (window >= {min_window_for_training})")
     groups, consumed_windows, consumed_keys = pull_training_groups(
-        backend, min_window=min_window_for_training
+        backend, min_window=min_window_for_training, cursor_path=args.cursor_path,
     )
     if len(groups) < args.min_new_groups:
         log(
