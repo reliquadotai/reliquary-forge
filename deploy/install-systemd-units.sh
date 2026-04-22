@@ -10,8 +10,14 @@ install -m 0644 "${REPO_ROOT}/deploy/systemd/reliquary-rl-worker.service" /etc/s
 install -m 0644 "${REPO_ROOT}/deploy/systemd/reliquary-github-runner.service" /etc/systemd/system/reliquary-github-runner.service
 install -m 0644 "${REPO_ROOT}/deploy/systemd/reliquary-backup.service" /etc/systemd/system/reliquary-backup.service
 install -m 0644 "${REPO_ROOT}/deploy/systemd/reliquary-backup.timer" /etc/systemd/system/reliquary-backup.timer
+install -m 0644 "${REPO_ROOT}/deploy/systemd/reliquary-forge-trainer.service" /etc/systemd/system/reliquary-forge-trainer.service
+install -m 0644 "${REPO_ROOT}/deploy/systemd/reliquary-forge-trainer.timer" /etc/systemd/system/reliquary-forge-trainer.timer
+install -m 0644 "${REPO_ROOT}/deploy/systemd/reliquary-forge-eval.service" /etc/systemd/system/reliquary-forge-eval.service
+install -m 0644 "${REPO_ROOT}/deploy/systemd/reliquary-forge-eval.timer" /etc/systemd/system/reliquary-forge-eval.timer
 
 systemctl daemon-reload
 systemctl enable reliquary-backup.timer
+systemctl enable reliquary-forge-trainer.timer
+systemctl enable reliquary-forge-eval.timer
 
 echo "Systemd units installed."

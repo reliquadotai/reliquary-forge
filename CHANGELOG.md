@@ -4,11 +4,29 @@ All notable changes to **Reliquary Forge** (`reliquary`) are documented
 here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 we version jointly with
 [reliquary-protocol](https://github.com/0xgrizz/reliquary-protocol) so both
-subnets bump in lockstep.
+runtimes bump in lockstep.
 
 ## [Unreleased]
 
 ### Added
+- Forge eval harness (`reliquary.eval.math_harness`). Runs the
+  deterministic MATH holdout against the current policy and publishes
+  signed `EvalBundle` artifacts to R2 every cycle. Greedy (T=0)
+  pass@1 mode is reproducible — same policy + same holdout produces
+  the same number every time; temperature (pass@k) mode is opt-in.
+  Bundle records policy hash + merkle root + per-problem correctness
+  + per-level / per-subject accuracy so third parties can re-run
+  independently. Published under
+  `eval_bundles/<netuid>/<window>/<run_id>.json`.
+- `scripts/run_forge_eval.py` — CLI entry that loads Qwen2.5-3B,
+  resolves the current Ledger window via subtensor, runs one eval
+  cycle, and publishes the bundle.
+- `deploy/systemd/reliquary-forge-eval.{service,timer}` — runs the
+  eval cycle every 120 min (matches the GRPO trainer's cadence while
+  avoiding GPU contention). Installed + enabled by
+  `deploy/install-systemd-units.sh`.
+- Eval runner wrapper (`deploy/scripts/run-forge-eval-cycle.sh`) with
+  size-based log rotation matching the trainer pattern.
 - `scripts/run_forge_grpo_live.py` — autonomous GRPO trainer that
   consumes zone-filtered rollout groups from the Ledger closed-loop
   bridge and publishes policy deltas back. Runs via systemd timer

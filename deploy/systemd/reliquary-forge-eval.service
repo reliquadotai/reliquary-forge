@@ -1,0 +1,18 @@
+[Unit]
+Description=Reliquary Forge one-shot eval cycle (MATH holdout)
+After=network-online.target
+Wants=network-online.target
+# Don't start a new cycle while the previous one is still running.
+ConditionPathExists=/opt/reliquary-repos/reliquary/scripts/run_forge_eval.py
+ConditionPathExists=/opt/reliquary-secrets/r2-cf-api-token
+ConditionPathExists=/opt/reliquary-secrets/signing-secret
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/opt/reliquary-deploy/run-forge-eval-cycle.sh
+Restart=no
+# Eval on 500 problems with max_new_tokens=1024 on Blackwell runs in
+# ~15-25 min for Qwen2.5-3B. Give headroom for slower hardware + HF
+# cold-cache downloads on first run.
+TimeoutStartSec=3600

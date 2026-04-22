@@ -1,0 +1,20 @@
+[Unit]
+Description=Periodic Reliquary Forge eval cycle (MATH holdout)
+Requires=reliquary-forge-eval.service
+
+[Timer]
+# Fire 10 min post-boot (delay after training so a fresh node doesn't
+# hit HF + R2 concurrently with the trainer), then every 120 min
+# thereafter. Greedy pass@1 eval on 500 problems with max_new_tokens
+# =1024 costs ~20 min on Blackwell, so 120 min cadence keeps GPU
+# availability healthy for mining + GRPO trainer while still producing
+# 12 eval points per day (plenty to show the learning curve).
+OnBootSec=10min
+OnUnitActiveSec=120min
+# Jitter so multiple eval hosts don't hit R2 at the same instant.
+RandomizedDelaySec=240
+# Persist last-run time across reboots.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

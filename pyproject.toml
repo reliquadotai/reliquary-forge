@@ -87,7 +87,7 @@ sandbox = [
     "RestrictedPython>=7.0",
 ]
 protocol = [
-    "reliquary-protocol>=0.1.0",
+    "reliquary-protocol>=0.3.0",
 ]
 r2 = [
     "boto3>=1.30.0",
