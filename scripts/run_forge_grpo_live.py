@@ -286,12 +286,74 @@ def pull_training_groups(
         f"in_zone_groups={len(in_zone_keys)} consumed_windows={len(consumed_windows)}"
     )
 
-    # 3. Completion bundles → rollouts, grouped by (miner, task) where in-zone.
-    # Huge perf optimisation: only fetch bundles whose window has at least
-    # one in-zone group. Bundles without any in-zone group can't contribute
-    # to training, so skipping them saves the biggest single category of
-    # R2 gets. Also memoise `used` state so post-training we don't
-    # reprocess bundles we already pulled rollouts from.
+    # 3a. Verdict bundles → {completion_id: correctness}.
+    # CRITICAL: miners don't evaluate their own completions — completion
+    # payloads DON'T carry a `correctness` field. Only validators compute
+    # it (via evaluate_math_trace) and embed it in verdict payloads.
+    # Without this lookup the trainer reads correctness=0 for every
+    # rollout → σ=0 → partial-seal gate drops every group.
+    #
+    # We only need verdicts for the windows that had in-zone groups, so
+    # we scope the scan to consumed_windows. Memoise fetched keys in the
+    # cursor so subsequent cycles skip already-read verdict bundles.
+    cursor.setdefault("verdict_bundles", {})
+    vb_keys = [k for k in backend.list("verdict_bundles/") if k.endswith(".json.gz")]
+    correctness_by_cid: dict[str, float] = {}
+    vb_errors = 0
+    vb_new = 0
+    for key in vb_keys:
+        try:
+            window_id = int(key.split("/")[1].split("-")[1])
+        except (IndexError, ValueError):
+            continue
+        if window_id not in consumed_windows:
+            continue
+        cached = cursor["verdict_bundles"].get(key)
+        if cached and isinstance(cached.get("correctness"), dict):
+            # Replay from cursor — no R2 fetch needed.
+            for cid, reward in cached["correctness"].items():
+                correctness_by_cid[str(cid)] = float(reward)
+            continue
+        try:
+            raw = backend.get(key)
+        except Exception:
+            vb_errors += 1
+            continue
+        if raw is None:
+            continue
+        try:
+            verdicts = json.loads(gzip.decompress(raw).decode())
+        except Exception:
+            continue
+        vb_new += 1
+        fresh: dict[str, float] = {}
+        for v in verdicts:
+            p = v.get("payload", {})
+            cid = str(p.get("completion_id") or "")
+            if not cid:
+                continue
+            try:
+                reward = float(p.get("correctness", 0.0))
+            except (TypeError, ValueError):
+                reward = 0.0
+            fresh[cid] = reward
+            correctness_by_cid[cid] = reward
+        cursor["verdict_bundles"][key] = {
+            "window_id": window_id,
+            "seen_at": iso_now,
+            "correctness": fresh,
+        }
+    log(
+        f"  verdict_bundles scanned={len(vb_keys)} new={vb_new} skipped_errors={vb_errors} "
+        f"correctness_map_size={len(correctness_by_cid)}"
+    )
+
+    # 3b. Completion bundles → rollouts, grouped by (miner, task) where in-zone.
+    # Only fetch bundles whose window has at least one in-zone group.
+    # Bundles without any in-zone group can't contribute to training,
+    # so skipping them saves the biggest single category of R2 gets.
+    # Also memoise `used` state so post-training we don't reprocess
+    # bundles we already pulled rollouts from.
     cb_keys = [k for k in backend.list("completion_bundles/") if k.endswith(".json.gz")]
     bucket: dict[tuple[str, str], list[Rollout]] = defaultdict(list)
     group_window: dict[tuple[str, str], int] = {}
@@ -336,10 +398,14 @@ def pull_training_groups(
             prompt, _ = task_index.get(task_id, ("", 0))
             if not prompt:
                 continue
+            # Correctness lives in the validator's verdict, not the miner's
+            # completion. Look it up in the map we built from verdict_bundles.
+            completion_id = str(c.get("artifact_id") or "")
+            reward = correctness_by_cid.get(completion_id, 0.0)
             rollout = Rollout(
                 completion_text=str(payload.get("completion_text", "")),
                 prompt=prompt,
-                correctness=float(payload.get("correctness", 0.0)),
+                correctness=reward,
                 tokens=list(payload.get("tokens") or []),
                 prompt_length=int(payload.get("prompt_length") or 0),
                 token_logprobs=list(payload.get("token_logprobs") or []),
