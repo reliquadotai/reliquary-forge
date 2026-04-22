@@ -149,8 +149,13 @@ def pull_training_groups(
     # 1. Task batches → {task_id: (prompt, window_id)}
     tb_keys = backend.list("task_batches/")
     task_index: dict[str, tuple[str, int]] = {}
+    tb_errors = 0
     for key in tb_keys:
-        raw = backend.get(key)
+        try:
+            raw = backend.get(key)
+        except Exception:
+            tb_errors += 1
+            continue
         if raw is None:
             continue
         try:
@@ -165,14 +170,28 @@ def pull_training_groups(
             prompt = task.get("prompt", "")
             if tid and prompt:
                 task_index[tid] = (prompt, window_id)
-    log(f"  task_batches scanned={len(tb_keys)} prompts_indexed={len(task_index)}")
+    log(
+        f"  task_batches scanned={len(tb_keys)} skipped_errors={tb_errors} "
+        f"prompts_indexed={len(task_index)}"
+    )
 
-    # 2. Scorecards → set of (miner_id, task_id) pairs flagged in_zone
+    # 2. Scorecards → set of (miner_id, task_id) pairs flagged in_zone.
+    # Under heavy mesh load a single scorecard GET can 429 despite the
+    # R2 backend's retry loop; don't crash the whole cycle on one bad
+    # fetch — count skips separately and proceed with what we got. The
+    # next cycle will retry the missed ones (R2 keys are stable).
     sc_keys = backend.list("scorecards/")
     in_zone_keys: set[tuple[str, str]] = set()
     consumed_windows: set[int] = set()
+    sc_errors = 0
     for key in sc_keys:
-        raw = backend.get(key)
+        try:
+            raw = backend.get(key)
+        except Exception as exc:
+            sc_errors += 1
+            if sc_errors <= 3:
+                log(f"  scorecard fetch error ({sc_errors}/?): {key} → {type(exc).__name__}")
+            continue
         if raw is None:
             continue
         try:
@@ -192,8 +211,8 @@ def pull_training_groups(
                 in_zone_keys.add((miner, task_id))
                 consumed_windows.add(window_id)
     log(
-        f"  scorecards scanned={len(sc_keys)} in_zone_groups={len(in_zone_keys)} "
-        f"consumed_windows={len(consumed_windows)}"
+        f"  scorecards scanned={len(sc_keys)} skipped_errors={sc_errors} "
+        f"in_zone_groups={len(in_zone_keys)} consumed_windows={len(consumed_windows)}"
     )
 
     # 3. Completion bundles → rollouts, grouped by (miner, task) where in-zone
@@ -201,6 +220,7 @@ def pull_training_groups(
     bucket: dict[tuple[str, str], list[Rollout]] = defaultdict(list)
     group_window: dict[tuple[str, str], int] = {}
     consumed_keys: list[str] = []
+    cb_errors = 0
     for key in cb_keys:
         try:
             window_id = int(key.split("/")[1].split("-")[1])
@@ -208,7 +228,11 @@ def pull_training_groups(
             continue
         if window_id < min_window:
             continue
-        raw = backend.get(key)
+        try:
+            raw = backend.get(key)
+        except Exception:
+            cb_errors += 1
+            continue
         if raw is None:
             continue
         try:
@@ -257,7 +281,8 @@ def pull_training_groups(
             )
         )
     log(
-        f"  completion_bundles scanned={len(cb_keys)} assembled_groups={len(groups)} "
+        f"  completion_bundles scanned={len(cb_keys)} skipped_errors={cb_errors} "
+        f"assembled_groups={len(groups)} "
         f"total_rollouts={sum(len(g.rollouts) for g in groups)}"
     )
     return groups, sorted(consumed_windows), consumed_keys
