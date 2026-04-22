@@ -22,7 +22,6 @@ from reliquary.distill.lane import (
     extract_final_answer,
 )
 
-
 # ---------------------------------------------------------------------------
 # _strip_think_blocks
 # ---------------------------------------------------------------------------
@@ -133,7 +132,8 @@ def test_contamination_screen_full_overlap_flagged() -> None:
     # Craft a text whose every ngram appears in benchmark.
     text = " ".join(f"tok{i}" for i in range(20))
     # Build the ngrams AFTER canonicalization so they match what the screen computes.
-    from reliquary.distill.lane import _canonicalize as canon, _shingle as shingle
+    from reliquary.distill.lane import _canonicalize as canon
+    from reliquary.distill.lane import _shingle as shingle
     benchmark = shingle(canon(text), n=DEFAULT_CONTAMINATION_NGRAM)
     result = contamination_screen(text, benchmark_ngrams=benchmark)
     assert result.overlap == 1.0
@@ -149,7 +149,8 @@ def test_contamination_screen_text_too_short() -> None:
 
 def test_contamination_screen_threshold_inclusive_exclusive() -> None:
     # Construct overlap exactly at threshold; should NOT flag.
-    from reliquary.distill.lane import _canonicalize as canon, _shingle as shingle
+    from reliquary.distill.lane import _canonicalize as canon
+    from reliquary.distill.lane import _shingle as shingle
     # Build 20 trigrams, 1 from benchmark: overlap = 1/20 = 0.05 (exactly threshold).
     text = " ".join(f"w{i}" for i in range(22))
     text_ngrams = shingle(canon(text), n=3)
@@ -163,7 +164,8 @@ def test_contamination_screen_threshold_inclusive_exclusive() -> None:
 
 
 def test_contamination_screen_matched_ngrams_capped_at_10() -> None:
-    from reliquary.distill.lane import _canonicalize as canon, _shingle as shingle
+    from reliquary.distill.lane import _canonicalize as canon
+    from reliquary.distill.lane import _shingle as shingle
     text = " ".join(f"w{i}" for i in range(50))
     text_ngrams = shingle(canon(text), n=3)
     result = contamination_screen(text, benchmark_ngrams=text_ngrams, ngram=3)

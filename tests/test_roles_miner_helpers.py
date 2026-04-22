@@ -10,10 +10,6 @@ downstream audit harness adversarial classes depend on.
 
 from __future__ import annotations
 
-from typing import Any
-
-import pytest
-
 from reliquary.envs.sat import generate_sat_challenge
 from reliquary.roles.miner import (
     _apply_proof_corruption,

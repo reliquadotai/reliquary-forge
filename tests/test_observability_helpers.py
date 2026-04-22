@@ -10,8 +10,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import pytest
-
 from reliquary.observability import (
     _decision_counts,
     _latest_artifact,
@@ -21,7 +19,6 @@ from reliquary.observability import (
 )
 from reliquary.protocol.artifacts import make_artifact
 from reliquary.storage.local_registry import LocalArtifactRegistry
-
 
 # ---------------------------------------------------------------------------
 # _metric_lines

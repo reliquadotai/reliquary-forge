@@ -26,7 +26,6 @@ from reliquary.protocol import proof as subnet_proof
 from reliquary.utils.json_io import sha256_json as subnet_sha256_json
 from reliquary.utils.json_io import stable_json_dumps as subnet_stable_json_dumps
 
-
 # ---------------------------------------------------------------------------
 # Canonicalization alignment
 # ---------------------------------------------------------------------------

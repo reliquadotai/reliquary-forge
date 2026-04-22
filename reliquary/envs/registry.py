@@ -29,10 +29,8 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass, field
-from typing import Iterable, Mapping
 
 from .sandbox import (
-    SandboxError,
     SandboxExecutor,
     SandboxPolicy,
     SandboxPolicyViolation,
@@ -44,7 +42,6 @@ from .spec import (
     env_spec_id,
     validate_env_spec,
 )
-
 
 REWARD_TOLERANCE = 1e-6
 

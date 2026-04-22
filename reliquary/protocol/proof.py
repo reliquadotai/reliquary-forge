@@ -4,9 +4,15 @@ import hashlib
 import hmac
 import random
 import struct
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .constants import CHALLENGE_K, LAYER_INDEX, PRIME_Q, PROOF_TOLERANCE, RNG_LABEL
+
+# `torch` is imported lazily inside each function so importing this
+# module on a CPU-only host (e.g. docs build) doesn't require a GPU
+# stack. TYPE_CHECKING fence lets the type hints stay accurate.
+if TYPE_CHECKING:
+    import torch
 
 
 def int_to_bytes(value: int) -> bytes:

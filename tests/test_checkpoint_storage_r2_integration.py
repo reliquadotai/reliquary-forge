@@ -25,7 +25,6 @@ pytestmark = pytest.mark.skipif(
 )
 
 from reliquary.training.checkpoint_storage import (
-    checkpoint_shard_key,
     fetch_bundle,
     publish_bundle,
 )

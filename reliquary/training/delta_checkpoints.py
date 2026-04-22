@@ -12,7 +12,7 @@ Spec: private/reliquary-plan/notes/spec-delta-checkpoints.md.
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Mapping
 
 
@@ -96,9 +96,8 @@ def _quantize_delta(delta) -> tuple[float, bytes, tuple[int, ...]]:
 
 
 def _dequantize(data_bytes: bytes, scale: float, shape: tuple[int, ...]):
-    import torch
-
     import numpy as np
+    import torch
 
     if scale == 0.0:
         return torch.zeros(shape, dtype=torch.float32)

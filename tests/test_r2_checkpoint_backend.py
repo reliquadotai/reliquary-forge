@@ -7,10 +7,8 @@ publish_bundle / fetch_bundle path the local filesystem backend uses.
 
 from __future__ import annotations
 
-import hashlib
 import io
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -18,7 +16,6 @@ import pytest
 torch = pytest.importorskip("torch")
 
 from reliquary.training.checkpoint_storage import (
-    CheckpointStorageBackend,
     fetch_bundle,
     publish_bundle,
 )

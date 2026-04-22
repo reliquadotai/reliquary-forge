@@ -12,8 +12,6 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
-import pytest
-
 from reliquary.runtime_status import (
     _iso_now,
     _parse_timestamp,
@@ -22,7 +20,6 @@ from reliquary.runtime_status import (
     runtime_status_dir,
     write_rl_worker_status,
 )
-
 
 # ---------------------------------------------------------------------------
 # _iso_now

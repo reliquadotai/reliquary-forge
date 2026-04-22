@@ -5,7 +5,6 @@ from typing import Any
 
 from ..utils.json_io import sha256_json
 
-
 Artifact = dict[str, Any]
 
 ARTIFACT_DIRECTORIES = {

@@ -31,7 +31,6 @@ from reliquary.training.delta_checkpoints import (
     _merkle_root_hex,
 )
 
-
 DELTA_STORAGE_VERSION = "v1"
 DELTA_STORAGE_MANIFEST_FILENAME = "manifest.json"
 DELTA_STORAGE_SHARD_PREFIX = "shards"

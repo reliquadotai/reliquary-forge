@@ -18,7 +18,6 @@ import logging
 import threading
 from typing import Any, Callable, Iterable, Iterator, Protocol
 
-
 logger = logging.getLogger(__name__)
 
 

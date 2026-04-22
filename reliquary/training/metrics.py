@@ -16,7 +16,6 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Deque
 
-
 TRAINING_LOSS_WINDOW = 32
 
 

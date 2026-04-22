@@ -13,8 +13,6 @@ import hashlib
 import hmac
 import struct
 
-import pytest
-
 from reliquary.protocol.constants import CHALLENGE_K, PRIME_Q, PROOF_TOLERANCE, RNG_LABEL
 from reliquary.protocol.proof import (
     derive_rollout_randomness,
@@ -24,7 +22,6 @@ from reliquary.protocol.proof import (
     sign_s_vals,
     verify_s_vals_signature,
 )
-
 
 # ---------------------------------------------------------------------------
 # int_to_bytes

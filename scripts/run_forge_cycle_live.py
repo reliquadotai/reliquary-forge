@@ -25,9 +25,7 @@ and verify the signature chain end-to-end.
 
 from __future__ import annotations
 
-import hashlib
 import os
-import sys
 import time
 
 # The reliquary-inference + reliquary packages are on staging2's venv via
@@ -36,9 +34,10 @@ import time
 os.environ.setdefault("HF_HOME", "/opt/reliquary-state/hf-cache")
 os.environ.setdefault("HUGGINGFACE_HUB_CACHE", "/opt/reliquary-state/hf-cache/hub")
 
+
 import torch
+from reliquary_protocol.storage import R2ObjectBackend
 from transformers import AutoModelForCausalLM
-from collections import defaultdict
 
 from reliquary.training.checkpoint_storage import publish_bundle
 from reliquary.training.delta_checkpoints import compute_delta
@@ -46,8 +45,6 @@ from reliquary.training.policy_attestation import (
     make_hmac_authority,
     publish_attestation,
 )
-from reliquary_protocol.storage import R2ObjectBackend
-
 
 MODEL_REF = "Qwen/Qwen2.5-3B-Instruct"
 INFERENCE_NETUID = 462

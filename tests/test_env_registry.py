@@ -10,7 +10,6 @@ pytest.importorskip("RestrictedPython", reason="RestrictedPython required")
 
 from reliquary.envs.registry import (
     BundleRejected,
-    BundleValidationReport,
     EnvBundle,
     EnvRegistry,
     RegistryDuplicate,
@@ -19,7 +18,6 @@ from reliquary.envs.registry import (
     validate_bundle_against_spec,
 )
 from reliquary.envs.spec import EnvMetadata, EnvSpec, EnvSpecStatus, env_spec_id
-
 
 _EVALUATOR_SOURCE = (
     "def evaluate(task, solution):\n"

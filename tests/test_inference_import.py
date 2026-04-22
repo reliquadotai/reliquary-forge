@@ -4,9 +4,14 @@ import gzip
 import json
 from pathlib import Path
 
-from reliquary.roles.trainer import import_inference_window, publish_policy, run_reasoning_rl_cycle, train_window
-from reliquary.storage.local_registry import LocalArtifactRegistry
 from reliquary.protocol.artifacts import make_artifact
+from reliquary.roles.trainer import (
+    import_inference_window,
+    publish_policy,
+    run_reasoning_rl_cycle,
+    train_window,
+)
+from reliquary.storage.local_registry import LocalArtifactRegistry
 from reliquary.training.backends import build_rl_learner_backend
 
 

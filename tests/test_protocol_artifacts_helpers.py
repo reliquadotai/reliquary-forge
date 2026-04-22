@@ -10,8 +10,6 @@ from __future__ import annotations
 
 import re
 
-import pytest
-
 from reliquary.protocol.artifacts import (
     ARTIFACT_DIRECTORIES,
     artifact_directory_name,

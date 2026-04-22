@@ -29,7 +29,6 @@ import traceback
 from dataclasses import dataclass, field
 from typing import Any
 
-
 SANDBOX_VERSION = "v1"
 
 DEFAULT_TIMEOUT_MS = 30_000
@@ -287,7 +286,6 @@ def _sandbox_child(source: str, entry_point: str, args_json: str, policy_dict: d
 
     try:
         from RestrictedPython import compile_restricted
-        from RestrictedPython.PrintCollector import PrintCollector
 
         bytecode = compile_restricted(source, "<sandbox>", "exec")
 

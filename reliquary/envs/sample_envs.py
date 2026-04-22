@@ -25,7 +25,6 @@ import hashlib
 from .registry import EnvBundle
 from .spec import EnvMetadata, EnvSpec
 
-
 # ---------------------------------------------------------------------------
 # SAT env source (self-contained, no reliance on reliquary.envs.sat)
 # ---------------------------------------------------------------------------

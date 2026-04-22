@@ -24,8 +24,8 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
 from .checkpoint_storage import (
-    CheckpointStorageBackend,
     DELTA_STORAGE_KIND_DELTA,
+    CheckpointStorageBackend,
     DeltaStorageManifestInvalid,
     DeltaStorageNotFound,
     DeltaStorageShardCorrupted,
@@ -41,7 +41,6 @@ from .delta_checkpoints import (
     DeltaShard,
     _merkle_root_hex,
 )
-
 
 DEFAULT_PARALLEL_WORKERS = 8
 

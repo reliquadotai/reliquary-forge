@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 
-import numpy as np
 import pytest
 import torch
+from reliquary_protocol import (
+    CHECKPOINT_ATTESTATION_TYPE,
+    HmacBridgeVerifier,
+    PolicyCommitment,
+    envelope_from_dict,
+    verify_envelope,
+    verify_policy_commitment,
+)
 
 from reliquary.training.checkpoint_storage import (
     DeltaStorageNotFound,
@@ -22,16 +28,6 @@ from reliquary.training.policy_attestation import (
     publish_attestation,
     smoke_hash_from_manifest,
 )
-from reliquary_protocol import (
-    CHECKPOINT_ATTESTATION_TYPE,
-    CheckpointAttestation,
-    HmacBridgeVerifier,
-    PolicyCommitment,
-    envelope_from_dict,
-    verify_envelope,
-    verify_policy_commitment,
-)
-
 
 AUTHORITY = "authority_fleet"
 SECRET = "authority-fleet-secret"

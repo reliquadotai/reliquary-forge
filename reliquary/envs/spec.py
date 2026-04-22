@@ -14,10 +14,9 @@ import hashlib
 import json
 import math
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any
-
 
 ENV_SPEC_VERSION = "v1"
 ENV_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9_]{2,63}$")

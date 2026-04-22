@@ -17,8 +17,6 @@ physically separate workers.
 
 from __future__ import annotations
 
-import os
-import sys
 import tempfile
 from pathlib import Path
 
@@ -42,6 +40,7 @@ def _worker(
 ) -> None:
     """One participating worker in the multi-process DiLoCo run."""
     import torch as _torch
+
     from reliquary.training.distributed import (
         DiLoCoConfig,
         DiLoCoOuterLoop,

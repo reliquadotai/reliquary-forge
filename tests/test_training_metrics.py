@@ -7,7 +7,6 @@ Covers the 14 acceptance cases from
 from __future__ import annotations
 
 import json
-import math
 import re
 from pathlib import Path
 
@@ -18,7 +17,6 @@ from reliquary.training.metrics import (
     TrainingMetrics,
     render_training_prometheus,
 )
-
 
 _DASHBOARD_PATH = (
     Path(__file__).resolve().parent.parent

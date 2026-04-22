@@ -3,7 +3,6 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
-
 SHOWCASE_PROFILES: dict[str, dict[str, Any]] = {
     "showcase": {
         "name": "showcase",

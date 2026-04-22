@@ -46,19 +46,18 @@ import argparse
 import copy
 import gzip
 import json
-import math
 import os
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Any
 
 os.environ.setdefault("HF_HOME", "/opt/reliquary-state/hf-cache")
 os.environ.setdefault("HUGGINGFACE_HUB_CACHE", "/opt/reliquary-state/hf-cache/hub")
 
+import bittensor as bt
 import torch
 import torch.nn.functional as F
-import bittensor as bt
+from reliquary_protocol.storage import R2ObjectBackend
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from reliquary.training.checkpoint_storage import publish_bundle
@@ -67,8 +66,6 @@ from reliquary.training.policy_attestation import (
     make_hmac_authority,
     publish_attestation,
 )
-from reliquary_protocol.storage import R2ObjectBackend
-
 
 # ---------------------------------------------------------------------------
 # Config — GRPO canonical hyperparameters + Qwen2.5-3B model details

@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 import time
 from pathlib import Path
@@ -39,16 +38,6 @@ for p in (
 
 
 import torch  # noqa: E402
-
-from reliquary.training.checkpoint_storage import (  # noqa: E402
-    CheckpointStorageBackend,
-    publish_bundle,
-)
-from reliquary.training.delta_checkpoints import compute_delta  # noqa: E402
-from reliquary.training.policy_attestation import (  # noqa: E402
-    make_hmac_authority,
-    publish_attestation,
-)
 from reliquary_inference.shared.policy_consumer import (  # noqa: E402
     LoadedDelta,
     PolicyConsumer,
@@ -68,6 +57,15 @@ from reliquary_inference.validator.rollout_bundle import (  # noqa: E402
 )
 from reliquary_protocol.storage import R2ObjectBackend  # noqa: E402
 
+from reliquary.training.checkpoint_storage import (  # noqa: E402
+    CheckpointStorageBackend,
+    publish_bundle,
+)
+from reliquary.training.delta_checkpoints import compute_delta  # noqa: E402
+from reliquary.training.policy_attestation import (  # noqa: E402
+    make_hmac_authority,
+    publish_attestation,
+)
 
 # Isolated namespace — never collides with production keys.
 RUN_ID = f"closed-loop-smoke-{int(time.time())}"

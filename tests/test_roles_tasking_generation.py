@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-import pytest
-
 from reliquary.distill.teacher import verify_trace_signature
 from reliquary.protocol.artifacts import finalize_policy_artifact, make_policy_artifact
 from reliquary.roles.generation import generate_distill_traces

@@ -26,7 +26,7 @@ Spec: ``02_TIER2_PRD.md`` Epic 3 + DiLoCo paper (v5 outer-loop).
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 
@@ -96,7 +96,6 @@ class MixedPrecisionPolicy:
     output_dtype: str = "bfloat16"
 
     def to_torch_policy(self) -> Any:
-        import torch
         from torch.distributed.fsdp import MixedPrecisionPolicy as _Policy
 
         return _Policy(

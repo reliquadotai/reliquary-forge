@@ -2,7 +2,11 @@ import json
 from pathlib import Path
 
 from reliquary.protocol.artifacts import make_artifact
-from reliquary.runtime_status import build_platform_status, read_rl_worker_status, write_rl_worker_status
+from reliquary.runtime_status import (
+    build_platform_status,
+    read_rl_worker_status,
+    write_rl_worker_status,
+)
 
 
 def _seed_inference_manifest(root: Path, *, window_id: int) -> None:

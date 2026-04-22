@@ -36,16 +36,14 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Mapping, Sequence
+from dataclasses import dataclass
+from typing import Sequence
 
 from reliquary_protocol import (
-    BridgeSigner,
     CHECKPOINT_ATTESTATION_TYPE,
+    BridgeSigner,
     CheckpointAttestation,
     HmacBridgeSigner,
-    POLICY_COMMITMENT_TYPE,
     PolicyCommitment,
     build_checkpoint_attestation,
     build_policy_commitment,
@@ -58,7 +56,6 @@ from .checkpoint_storage import (
     DeltaStorageNotFound,
     checkpoint_manifest_key,
 )
-
 
 logger = logging.getLogger(__name__)
 

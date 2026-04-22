@@ -12,8 +12,8 @@ from ..envs.reasoning import (
     summarize_reasoning_evaluations,
 )
 from ..protocol.artifacts import make_artifact
-from ..training.ray_cluster import evaluate_reasoning_checkpoint_remote, run_grpo_training_remote
 from ..storage.registry import ArtifactRegistry
+from ..training.ray_cluster import run_grpo_training_remote
 from ..utils.json_io import read_json, write_json
 
 
@@ -444,6 +444,7 @@ class TransformersSFTLearnerBackend:
     ) -> dict[str, Any]:
         try:
             import inspect
+
             import torch
             from datasets import Dataset
             from peft import LoraConfig

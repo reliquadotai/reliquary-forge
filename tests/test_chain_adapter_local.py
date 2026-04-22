@@ -9,8 +9,6 @@ verifies the event record ordering + payload shape.
 
 from __future__ import annotations
 
-from typing import Any
-
 from reliquary.chain.adapters import LocalChainAdapter
 from reliquary.protocol.artifacts import make_artifact, make_policy_artifact
 

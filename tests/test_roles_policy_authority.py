@@ -10,7 +10,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from reliquary.protocol.artifacts import finalize_policy_artifact, make_artifact, make_policy_artifact
+from reliquary.protocol.artifacts import (
+    make_artifact,
+)
 from reliquary.roles.policy_authority import (
     _quorum_members,
     make_policy_authority_decision,

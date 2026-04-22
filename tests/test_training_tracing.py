@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 import pytest
 
 from reliquary.training import tracing
-
 
 pytestmark = pytest.mark.skipif(
     not tracing.is_otel_available(),

@@ -28,7 +28,6 @@ from reliquary.envs.reasoning import (
     summarize_reasoning_evaluations,
 )
 
-
 # ---------------------------------------------------------------------------
 # _solve
 # ---------------------------------------------------------------------------
@@ -258,7 +257,7 @@ def test_evaluate_reasoning_trace_noncanonical_format_reason() -> None:
 def test_evaluate_reasoning_trace_policy_compliance_band() -> None:
     task = generate_reasoning_tasks(count=1, seed=5, split="train")[0]
     # canonical + reason → 1.0
-    assert evaluate_reasoning_trace(task, f"Reasoning: x\nFinal Answer: 0")["policy_compliance"] == pytest.approx(
+    assert evaluate_reasoning_trace(task, "Reasoning: x\nFinal Answer: 0")["policy_compliance"] == pytest.approx(
         1.0 if "Reasoning:" else 0.75
     )
     # canonical without "reason"/"step" → 0.75

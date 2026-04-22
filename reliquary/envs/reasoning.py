@@ -4,7 +4,6 @@ import random
 import re
 from typing import Any
 
-
 OPS = (
     "add",
     "subtract",

@@ -8,8 +8,6 @@ caught at CI.
 
 from __future__ import annotations
 
-from typing import Any
-
 import pytest
 
 from reliquary.shared.config import load_runtime_config

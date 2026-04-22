@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import time
-from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -72,7 +71,6 @@ def _sequence_logprob(model, full_token_ids: list[int], prompt_len: int, device:
 
 
 def _gradient_norm(model) -> float:
-    import torch
 
     total_sq = 0.0
     for parameter in model.parameters():

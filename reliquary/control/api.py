@@ -6,8 +6,13 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import PlainTextResponse
 
 from ..observability import build_metrics_text
-from ..roles.policy_authority import make_policy_authority_decision, promote_checkpoint_to_policy, publish_distill_policy
-from ..roles.trainer import import_inference_window, publish_policy as publish_rl_policy, run_reasoning_rl_cycle
+from ..roles.policy_authority import (
+    make_policy_authority_decision,
+    promote_checkpoint_to_policy,
+    publish_distill_policy,
+)
+from ..roles.trainer import import_inference_window, run_reasoning_rl_cycle
+from ..roles.trainer import publish_policy as publish_rl_policy
 from ..runtime_status import build_platform_status
 from ..shared.bootstrap import bootstrap_runtime
 

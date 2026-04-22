@@ -8,7 +8,6 @@ these tests cover the determinism and screening properties only.
 from __future__ import annotations
 
 from reliquary.distill.lane import (
-    DEFAULT_FINAL_ANSWER_REGEX,
     DistillTask,
     ScreenResult,
     StudentCompletionArtifact,

@@ -6,7 +6,12 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from ..storage import LocalArtifactRegistry, PostgresMetadataIndex, R2ArtifactRegistry, SqliteMetadataIndex
+from ..storage import (
+    LocalArtifactRegistry,
+    PostgresMetadataIndex,
+    R2ArtifactRegistry,
+    SqliteMetadataIndex,
+)
 from ..storage.registry import ArtifactRegistry
 from .config import load_runtime_config
 

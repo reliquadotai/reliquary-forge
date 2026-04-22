@@ -13,7 +13,6 @@ from reliquary.envs.cli import main
 from reliquary.envs.registry import EnvBundle
 from reliquary.envs.spec import EnvMetadata, EnvSpec, canonical_env_spec_bytes
 
-
 _EVALUATOR = (
     "def evaluate(task, solution):\n"
     "    target = task['answer']\n"

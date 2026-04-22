@@ -13,15 +13,12 @@ import json
 from pathlib import Path
 from typing import Any
 
-import pytest
-
 from reliquary.inference_adapter import (
     InferenceRegistryAdapter,
     _read_gzip_json_bytes,
     _utc_now,
 )
 from reliquary.utils.json_io import write_json
-
 
 # ---------------------------------------------------------------------------
 # _read_gzip_json_bytes / _utc_now

@@ -21,13 +21,11 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-import time
 import unicodedata
 from dataclasses import asdict, dataclass, field
-from typing import Any, Iterable
+from typing import Iterable
 from urllib import error as urlerror
 from urllib import request
-
 
 DEFAULT_CONTAMINATION_NGRAM = 10
 DEFAULT_CONTAMINATION_THRESHOLD = 0.05

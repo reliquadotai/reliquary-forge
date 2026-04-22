@@ -36,18 +36,13 @@ Spec: ``02_TIER2_PRD.md`` Epic 3 + ``spec-closed-loop-bridge.md`` §7.
 from __future__ import annotations
 
 import argparse
-import hashlib
-import json
 import logging
 import os
 import sys
-import time
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Callable, Mapping, Protocol, Sequence
+from dataclasses import dataclass
+from typing import Any, Mapping, Protocol, Sequence
 
 from .checkpoint_storage import (
-    CheckpointManifest,
     CheckpointStorageBackend,
     LocalFilesystemBackend,
     publish_bundle,
@@ -68,7 +63,6 @@ from .policy_attestation import (
     make_hmac_authority,
     publish_attestation,
 )
-
 
 logger = logging.getLogger(__name__)
 

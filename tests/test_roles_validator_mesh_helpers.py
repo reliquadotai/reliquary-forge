@@ -9,8 +9,6 @@ model.
 
 from __future__ import annotations
 
-from typing import Any
-
 import pytest
 
 from reliquary.protocol.artifacts import make_artifact
@@ -21,7 +19,6 @@ from reliquary.roles.validator_mesh import (
     _rl_verdict_explanation,
     _sat_difficulty,
 )
-
 
 # ---------------------------------------------------------------------------
 # _sat_difficulty

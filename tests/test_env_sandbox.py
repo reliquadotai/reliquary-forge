@@ -19,7 +19,6 @@ from reliquary.envs.sandbox import (
     SandboxExecutor,
     SandboxPolicy,
     SandboxPolicyViolation,
-    SandboxResult,
     _ast_audit,
 )
 

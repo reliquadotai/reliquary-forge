@@ -25,7 +25,6 @@ def _load_tokenizer(model_ref: str):
 
 def load_model_bundle(model_ref: str, device: str = "cpu", trainable: bool = False) -> dict[str, Any]:
     from transformers import AutoModelForCausalLM
-    import torch
 
     resolved_ref, kwargs = _resolve_pretrained_ref(model_ref)
     tokenizer = _load_tokenizer(model_ref)

@@ -5,9 +5,39 @@ build-backend = "hatchling.build"
 [project]
 name = "reliquary"
 version = "0.1.0"
-description = "Verified decentralized on-policy RL subnet scaffold"
+description = "Reliquary Forge — trainer-quorum runtime for decentralized DAPO/GRPO post-training on Bittensor"
 readme = "README.md"
 requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "Reliquary contributors" }]
+keywords = [
+  "bittensor",
+  "subnet",
+  "reliquary",
+  "forge",
+  "grpo",
+  "dapo",
+  "rl",
+  "post-training",
+  "distillation",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+[project.urls]
+Homepage = "https://github.com/0xgrizz/reliquary"
+Repository = "https://github.com/0xgrizz/reliquary"
+Issues = "https://github.com/0xgrizz/reliquary/issues"
+Changelog = "https://github.com/0xgrizz/reliquary/blob/main/CHANGELOG.md"
 dependencies = [
     "typer==0.16.1",
     "rich==14.1.0",
@@ -72,6 +102,13 @@ packages = ["reliquary"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+
+[tool.ruff.lint.per-file-ignores]
+# Test files do sys.path manipulation (to inject sibling-repo imports)
+# BEFORE importing — ruff E402 can't tell the difference.
+"tests/**/*.py" = ["E402"]
+# Scripts similarly do os.environ.setdefault() before top-of-file imports.
+"scripts/**/*.py" = ["E402"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
