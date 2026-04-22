@@ -314,6 +314,14 @@ def run_eval_cycle(
             bundle.accuracy,
             bundle.n_problems,
         )
+        try:
+            update_eval_index(backend=backend, bundle=bundle, storage_key=storage_key)
+        except Exception as exc:  # pragma: no cover - index write is best-effort
+            logger.warning(
+                "forge.eval.update_index failed (non-fatal): %s: %s",
+                type(exc).__name__,
+                exc,
+            )
 
     duration = time.perf_counter() - started
     return EvalCycleResult(
@@ -322,6 +330,101 @@ def run_eval_cycle(
         storage_key=storage_key,
         duration_seconds=duration,
     )
+
+
+# ---------------------------------------------------------------------------
+# Rolling discovery index
+# ---------------------------------------------------------------------------
+
+
+#: Max entries kept in the rolling discovery index. 200 covers ~14 days
+#: at a 120-min cadence — plenty of runway for dashboards without
+#: bloating the pointer file past a few tens of KB.
+EVAL_INDEX_MAX_ENTRIES: int = 200
+
+
+def eval_index_key(inference_netuid: int) -> str:
+    """R2 key for the rolling eval-bundle discovery index.
+
+    Third parties (the web dashboard, audit tooling) read this single
+    key to discover recent eval bundles without needing an R2 LIST. The
+    file is a JSON array of compact summaries sorted newest-first; each
+    entry carries the fields needed to render an accuracy time-series
+    + a pointer to the full bundle for drill-down.
+    """
+    return f"eval_bundles/{int(inference_netuid)}/index.json"
+
+
+def update_eval_index(
+    *,
+    backend: "R2ObjectBackend",
+    bundle: EvalBundle,
+    storage_key: str,
+) -> list[dict[str, Any]]:
+    """Append ``bundle``'s summary to the eval-discovery index.
+
+    Read-modify-write against a single R2 key. Not atomic under
+    concurrent writers — today Forge runs eval on a single node, but
+    if we scale out we need a CAS primitive or a per-writer shard.
+    Entries are kept newest-first and capped at
+    :data:`EVAL_INDEX_MAX_ENTRIES`.
+
+    Returns the written entry list for testability.
+    """
+    import json as _json
+
+    key = eval_index_key(bundle.inference_netuid)
+    current: list[dict[str, Any]] = []
+    try:
+        raw = backend.get(key)
+    except Exception:
+        raw = None
+    if raw is not None:
+        try:
+            parsed = _json.loads(raw.decode("utf-8"))
+            if isinstance(parsed, list):
+                current = [dict(e) for e in parsed if isinstance(e, dict)]
+        except Exception:  # pragma: no cover - malformed index is recoverable
+            current = []
+
+    entry = {
+        "eval_run_id": bundle.eval_run_id,
+        "eval_window_id": int(bundle.eval_window_id),
+        "storage_key": storage_key,
+        "artifact_id": bundle.artifact_id(),
+        "policy_artifact_id": bundle.policy_artifact_id,
+        "policy_merkle_root_hex": bundle.policy_merkle_root_hex,
+        "model_ref": bundle.model_ref,
+        "holdout_version": bundle.holdout_version,
+        "holdout_size": int(bundle.holdout_size),
+        "n_problems": int(bundle.n_problems),
+        "n_samples_per_problem": int(bundle.n_samples_per_problem),
+        "sampling_mode": bundle.sampling_mode,
+        "accuracy": float(bundle.accuracy),
+        "mean_reward": float(bundle.mean_reward),
+        "accuracy_by_level": dict(bundle.accuracy_by_level),
+        "accuracy_by_subject": dict(bundle.accuracy_by_subject),
+        "evaluator_hotkey": bundle.evaluator_hotkey,
+        "evaluated_at": bundle.evaluated_at,
+    }
+
+    # Drop any prior entry with the same eval_run_id (idempotent re-publish).
+    deduped = [e for e in current if e.get("eval_run_id") != entry["eval_run_id"]]
+    deduped.insert(0, entry)
+    trimmed = deduped[:EVAL_INDEX_MAX_ENTRIES]
+
+    body = _json.dumps(
+        {
+            "version": "1",
+            "inference_netuid": int(bundle.inference_netuid),
+            "training_netuid": int(bundle.training_netuid),
+            "entries": trimmed,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    backend.put(key, body)
+    return trimmed
 
 
 def aggregate_summary(bundle: EvalBundle) -> dict[str, Any]:
@@ -353,9 +456,12 @@ def aggregate_summary(bundle: EvalBundle) -> dict[str, Any]:
 
 
 __all__ = [
+    "EVAL_INDEX_MAX_ENTRIES",
     "EVAL_SYSTEM_PROMPT",
     "EvalCycleResult",
     "aggregate_summary",
+    "eval_index_key",
+    "update_eval_index",
     "render_eval_prompt",
     "run_eval_cycle",
 ]

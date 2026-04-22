@@ -368,11 +368,14 @@ def test_run_eval_cycle_publish_requires_backend(stubbed_holdout, tokenizer):
 
 
 def test_run_eval_cycle_publishes_to_backend(stubbed_holdout, tokenizer):
-    captured: dict[str, bytes] = {}
+    store: dict[str, bytes] = {}
 
     class _FakeBackend:
         def put(self, key: str, data: bytes) -> None:
-            captured[key] = data
+            store[key] = data
+
+        def get(self, key: str) -> bytes | None:
+            return store.get(key)
 
     completions = {"1 + 1": r"\boxed{2}", "2 + 2": r"\boxed{4}",
                    "5 * 5": r"\boxed{25}", "10 / 2": r"\boxed{5}"}
@@ -391,16 +394,115 @@ def test_run_eval_cycle_publishes_to_backend(stubbed_holdout, tokenizer):
         policy_merkle_root_hex="",
         publish=True,
     )
-    assert result.storage_key in captured
+    assert result.storage_key in store
     assert result.storage_key.startswith("eval_bundles/462/12345/forge-eval-")
     # The put payload must decode via envelope_from_dict round-trip.
     import json
 
     from reliquary_protocol import envelope_from_dict
 
-    envelope = envelope_from_dict(json.loads(captured[result.storage_key]))
+    envelope = envelope_from_dict(json.loads(store[result.storage_key]))
     _, verifier = _signer_and_verifier()
     assert verify_envelope(envelope, verifier) is True
+
+    # Rolling index must be updated so web-side discovery can find the bundle.
+    index_key = "eval_bundles/462/index.json"
+    assert index_key in store
+    index_body = json.loads(store[index_key])
+    assert index_body["version"] == "1"
+    assert index_body["inference_netuid"] == 462
+    assert index_body["entries"][0]["eval_run_id"] == result.bundle.eval_run_id
+    assert index_body["entries"][0]["accuracy"] == pytest.approx(result.bundle.accuracy)
+    assert index_body["entries"][0]["storage_key"] == result.storage_key
+
+
+def test_update_eval_index_caps_at_max_entries(stubbed_holdout, tokenizer):
+    """Growth ceiling — the rolling index must not balloon indefinitely."""
+    from reliquary.eval.math_harness import EVAL_INDEX_MAX_ENTRIES, update_eval_index
+    from reliquary_protocol import build_eval_bundle
+
+    store: dict[str, bytes] = {}
+
+    class _FakeBackend:
+        def put(self, key: str, data: bytes) -> None:
+            store[key] = data
+
+        def get(self, key: str) -> bytes | None:
+            return store.get(key)
+
+    backend = _FakeBackend()
+    for i in range(EVAL_INDEX_MAX_ENTRIES + 20):
+        bundle = build_eval_bundle(
+            training_netuid=462,
+            inference_netuid=462,
+            eval_run_id=f"forge-eval-{i:08d}",
+            eval_window_id=10_000 + i,
+            policy_artifact_id="0" * 64,
+            policy_merkle_root_hex="",
+            model_ref="stub://t",
+            holdout_version="v1",
+            holdout_seed="s",
+            holdout_dataset="d",
+            holdout_size=1,
+            holdout_task_ids=["abc"],
+            n_samples_per_problem=1,
+            sampling_mode="greedy",
+            per_problem_results=[{"task_id": "abc", "correctness": 1.0}],
+            evaluator_hotkey="eval-a",
+        )
+        update_eval_index(
+            backend=backend, bundle=bundle, storage_key=bundle.storage_key()
+        )
+
+    import json
+
+    index_body = json.loads(store["eval_bundles/462/index.json"])
+    assert len(index_body["entries"]) == EVAL_INDEX_MAX_ENTRIES
+    # Newest-first ordering preserved: the most recent write is slot 0.
+    last_id = f"forge-eval-{EVAL_INDEX_MAX_ENTRIES + 19:08d}"
+    assert index_body["entries"][0]["eval_run_id"] == last_id
+
+
+def test_update_eval_index_is_idempotent_on_rerun(stubbed_holdout, tokenizer):
+    """Re-publishing the same run_id must not duplicate the entry."""
+    from reliquary.eval.math_harness import update_eval_index
+    from reliquary_protocol import build_eval_bundle
+
+    store: dict[str, bytes] = {}
+
+    class _FakeBackend:
+        def put(self, key: str, data: bytes) -> None:
+            store[key] = data
+
+        def get(self, key: str) -> bytes | None:
+            return store.get(key)
+
+    backend = _FakeBackend()
+    bundle = build_eval_bundle(
+        training_netuid=462,
+        inference_netuid=462,
+        eval_run_id="forge-eval-dup-test",
+        eval_window_id=77_777,
+        policy_artifact_id="0" * 64,
+        policy_merkle_root_hex="",
+        model_ref="stub://t",
+        holdout_version="v1",
+        holdout_seed="s",
+        holdout_dataset="d",
+        holdout_size=1,
+        holdout_task_ids=["abc"],
+        n_samples_per_problem=1,
+        sampling_mode="greedy",
+        per_problem_results=[{"task_id": "abc", "correctness": 1.0}],
+        evaluator_hotkey="eval-a",
+    )
+    update_eval_index(backend=backend, bundle=bundle, storage_key=bundle.storage_key())
+    update_eval_index(backend=backend, bundle=bundle, storage_key=bundle.storage_key())
+    import json
+
+    index_body = json.loads(store["eval_bundles/462/index.json"])
+    ids = [e["eval_run_id"] for e in index_body["entries"]]
+    assert ids.count("forge-eval-dup-test") == 1
 
 
 # ---------------------------------------------------------------------------
