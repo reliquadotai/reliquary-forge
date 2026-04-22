@@ -402,13 +402,22 @@ def pull_training_groups(
             # completion. Look it up in the map we built from verdict_bundles.
             completion_id = str(c.get("artifact_id") or "")
             reward = correctness_by_cid.get(completion_id, 0.0)
+            # Miner's payload uses `completion_logprobs` (see
+            # reliquary_inference/miner/engine.py:291). Older Romain-
+            # derived code called it `token_logprobs`; support both so
+            # we're compatible with either miner build.
+            logprobs = (
+                payload.get("completion_logprobs")
+                or payload.get("token_logprobs")
+                or []
+            )
             rollout = Rollout(
                 completion_text=str(payload.get("completion_text", "")),
                 prompt=prompt,
                 correctness=reward,
                 tokens=list(payload.get("tokens") or []),
                 prompt_length=int(payload.get("prompt_length") or 0),
-                token_logprobs=list(payload.get("token_logprobs") or []),
+                token_logprobs=list(logprobs),
             )
             bucket[(miner, task_id)].append(rollout)
             group_window[(miner, task_id)] = window_id
