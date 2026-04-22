@@ -593,6 +593,37 @@ def _save_state(path: str, state: dict) -> None:
     os.replace(tmp, path)
 
 
+# R2 backup key for the forge trainer state. Mirrors the local file so a
+# node rebuild / disk-loss doesn't reset the trainer to MIN_LIVE_WINDOW
+# and re-process already-trained rollouts (which would cause dup deltas +
+# thrash the miner policy).
+FORGE_STATE_R2_KEY_DEFAULT = "forge/state/forge-trainer-state.json"
+
+
+def _backup_state_to_r2(backend: R2ObjectBackend, state: dict, *, r2_key: str) -> None:
+    """Best-effort R2 backup of the forge trainer state.
+
+    Swallows exceptions — the local file is the authoritative copy,
+    R2 is the disaster-recovery mirror. A transient R2 error should
+    not fail the training cycle.
+    """
+    try:
+        backend.put(r2_key, json.dumps(state, indent=2, sort_keys=True).encode("utf-8"))
+    except Exception as exc:
+        log(f"  state r2 backup failed (non-fatal): {type(exc).__name__}: {exc}")
+
+
+def _restore_state_from_r2(backend: R2ObjectBackend, *, r2_key: str) -> dict | None:
+    """Pull the state JSON from R2. Returns None if not found."""
+    try:
+        raw = backend.get(r2_key)
+        if raw is None:
+            return None
+        return json.loads(raw.decode("utf-8"))
+    except Exception:
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -647,6 +678,16 @@ def main() -> int:
         ),
     )
     parser.add_argument(
+        "--state-r2-key",
+        default=FORGE_STATE_R2_KEY_DEFAULT,
+        help=(
+            "R2 key to mirror the trainer state to on each save. If the "
+            "local file is missing at startup (fresh node build / disk "
+            "loss), the trainer pulls from this key as disaster recovery. "
+            "Set to '' to disable R2 mirroring."
+        ),
+    )
+    parser.add_argument(
         "--force",
         action="store_true",
         help="Re-train on all post-v5 data regardless of state file.",
@@ -663,6 +704,14 @@ def main() -> int:
     )
 
     state = _load_state(args.state_file)
+    # If the local state file is missing / empty (fresh node build, disk
+    # loss), transparently restore from R2 so the trainer doesn't reset
+    # last_trained_window to MIN_LIVE_WINDOW and thrash the policy.
+    if not state:
+        restored = _restore_state_from_r2(backend, r2_key=args.state_r2_key)
+        if restored:
+            state = restored
+            log(f"  restored state from R2 key {args.state_r2_key}")
     if args.force:
         last_trained_window = MIN_LIVE_WINDOW
         log(f"--force: re-training on all data from window {last_trained_window}")
@@ -775,6 +824,7 @@ def main() -> int:
         if consumed_windows:
             state["last_trained_window"] = int(max(consumed_windows)) + 1
             _save_state(args.state_file, state)
+            _backup_state_to_r2(backend, state, r2_key=args.state_r2_key)
         return 0
 
     log("computing delta bundle")
@@ -828,7 +878,11 @@ def main() -> int:
     )
     state["runs"] = state["runs"][-20:]
     _save_state(args.state_file, state)
-    log(f"  state written: last_trained_window={state.get('last_trained_window')}")
+    _backup_state_to_r2(backend, state, r2_key=args.state_r2_key)
+    log(
+        f"  state written: last_trained_window={state.get('last_trained_window')} "
+        f"(r2 backup: {args.state_r2_key})"
+    )
 
     print("SUMMARY:", flush=True)
     print(json.dumps({
