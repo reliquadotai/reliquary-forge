@@ -415,13 +415,21 @@ def pull_training_groups(
             used_any = True
         if used_any:
             consumed_keys.append(key)
+        # NOTE: we defer marking `used=True` until AFTER σ-filter downstream.
+        # A bundle whose rollouts all collapsed to σ=0 shouldn't be
+        # locked in as "consumed" — that's how the pre-correctness-fix
+        # cycles bricked the cursor (see /opt/reliquary-state/forge-grpo-
+        # cursor.json.bak.pre-correctness-fix). Mark `seen=True` only so
+        # we don't repeatedly scan the key each cycle.
         cursor["completion_bundles"][key] = {
             "window_id": window_id,
             "seen_at": iso_now,
-            "used": used_any,
+            "used": False,  # overwritten below if any group survives σ-filter
+            "keys_extracted": used_any,
         }
 
     groups: list[RolloutGroup] = []
+    productive_windows: set[int] = set()
     for (miner, task_id), rollouts in bucket.items():
         if len(rollouts) < 2:
             continue  # need n≥2 for a meaningful σ
@@ -438,6 +446,16 @@ def pull_training_groups(
                 rollouts=rollouts,
             )
         )
+        if std > 1e-8:
+            productive_windows.add(group_window.get((miner, task_id), 0))
+    # Now commit `used=True` on the completion_bundle cursor entries
+    # whose window produced at least one σ>0 group. Bundles that
+    # extracted rollouts but collapsed to σ=0 stay `used=False` so a
+    # future correctness re-check (e.g. bug fix, validator update) can
+    # re-pull them without needing a cursor wipe.
+    for key, entry in cursor["completion_bundles"].items():
+        if entry.get("keys_extracted") and entry.get("window_id") in productive_windows:
+            entry["used"] = True
     log(
         f"  completion_bundles scanned={len(cb_keys)} new_fetched={cb_new} skipped_errors={cb_errors} "
         f"assembled_groups={len(groups)} "
