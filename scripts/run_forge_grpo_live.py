@@ -523,6 +523,16 @@ def main() -> int:
         help="Blocks past current_window to schedule the hot-swap at.",
     )
     parser.add_argument(
+        "--min-mean-abs-delta",
+        type=float,
+        default=1e-7,
+        help=(
+            "Partial-seal gate: skip publishing a delta when the mean abs "
+            "parameter change is below this threshold. Prevents zero-delta "
+            "commitments from burning R2 bandwidth + chain commitment slots."
+        ),
+    )
+    parser.add_argument(
         "--force",
         action="store_true",
         help="Re-train on all post-v5 data regardless of state file.",
@@ -554,6 +564,23 @@ def main() -> int:
         log(
             f"only {len(groups)} in-zone groups since window {min_window_for_training} — "
             f"need {args.min_new_groups}. Skipping cycle (exit 0, not an error)."
+        )
+        return 0
+
+    # Partial-seal gate: drop groups with σ=0 upfront. The zone filter
+    # already rejects σ < σ_min at the validator, but old scorecards
+    # from before miner_id got embedded in the verdict payload can still
+    # surface σ=0 groups here. Training on them wastes a forge cycle —
+    # GRPO advantage = (r − μ)/σ → 0 → zero gradient → zero delta.
+    nonzero_groups = [g for g in groups if g.sigma > 1e-8]
+    dropped = len(groups) - len(nonzero_groups)
+    if dropped:
+        log(f"  dropped {dropped}/{len(groups)} groups with σ=0 (no within-group contrast)")
+    groups = nonzero_groups
+    if len(groups) < args.min_new_groups:
+        log(
+            f"after σ=0 filter: only {len(groups)} trainable groups — need "
+            f"{args.min_new_groups}. Skipping cycle (exit 0, not an error)."
         )
         return 0
     log(
@@ -618,6 +645,23 @@ def main() -> int:
     sample_name = target_names[0]
     d = (post_params[sample_name] - pre_params[sample_name]).abs().mean().item()
     log(f"  mean abs delta on {sample_name}: {d:.6e}")
+
+    # Partial-seal: don't commit a zero-delta policy to the bridge. Happens
+    # when all groups had σ≈0 at training time (advantage=0 → gradient=0 →
+    # no parameter change). Publishing would waste an R2 upload + a chain
+    # commitment slot, and miner policy_consumer applies a no-op delta.
+    min_delta = float(args.min_mean_abs_delta)
+    if d < min_delta:
+        log(
+            f"mean abs delta {d:.6e} < min_mean_abs_delta {min_delta:.6e} — "
+            f"policy didn't move; skipping publish (exit 0)."
+        )
+        # Advance last_trained_window anyway so we don't re-train on the
+        # same dead groups next cycle.
+        if consumed_windows:
+            state["last_trained_window"] = int(max(consumed_windows)) + 1
+            _save_state(args.state_file, state)
+        return 0
 
     log("computing delta bundle")
     bundle = compute_delta(pre_params, post_params)
