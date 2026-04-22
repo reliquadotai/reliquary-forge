@@ -2,8 +2,9 @@
 
 ## What is Reliquary Forge?
 
-The trainer-quorum half of Reliquary, a two-subnet Bittensor platform.
-Forge consumes verified rollout groups from
+The trainer-quorum runtime for Reliquary, a proof-carrying Bittensor subnet
+that runs two companion protocols under a single netuid. Forge consumes
+verified rollout groups from
 [Ledger](https://github.com/0xgrizz/reliquary-inference) (netuid 462) and
 publishes policy deltas back through a cryptographically signed
 closed-loop bridge.
@@ -70,7 +71,7 @@ A signed on-chain commitment pattern:
 
 All three artifacts use the canonical serialization from
 [reliquary-protocol](https://github.com/0xgrizz/reliquary-protocol)
-so the two subnets cross-verify deterministically.
+so both runtimes cross-verify deterministically.
 
 ## What prevents a compromised Forge from poisoning Ledger?
 

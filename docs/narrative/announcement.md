@@ -1,8 +1,8 @@
 # Reliquary Forge — launch announcement
 
-**2026-04-22.** Reliquary Forge, the trainer-quorum half of the Reliquary
-two-subnet platform, is live on the testnet closed-loop bridge with its
-sibling [Ledger](https://github.com/0xgrizz/reliquary-inference) (netuid 462).
+**2026-04-22.** Reliquary Forge, the trainer-quorum runtime that runs as a
+companion protocol alongside Ledger on a single subnet, is live on the testnet
+closed-loop bridge with its companion [Ledger](https://github.com/0xgrizz/reliquary-inference) (netuid 462).
 
 ## What Forge does
 
@@ -58,9 +58,9 @@ for the Ledger side.
    sandboxed task-generator + reward-function spec; validators vote
    acceptance; stake-backed sponsors. Design lives in
    [`docs/lightweight-inference-subnet-blueprint.md`](../lightweight-inference-subnet-blueprint.md).
-5. **Mainnet Forge on a dedicated netuid.** The two-subnet model
-   (Ledger + Forge) is the canonical target; the specific netuid
-   assignment will be announced when the 4-week track record is in.
+5. **Mainnet Forge at production cadence.** The dual-protocol design
+   (Ledger + Forge on one netuid) is the canonical target; the
+   production cadence will be announced when the 4-week track record is in.
 
 ## The policy on governance
 

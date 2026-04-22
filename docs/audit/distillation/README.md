@@ -78,4 +78,4 @@ PY
 - **Larger task batch**: 4 tasks is a pilot. Production runs use ≥ 32 per window (matching the nine-stage verifier's CHALLENGE_K).
 - **Contamination benchmark expansion**: `default_benchmark_ngrams()` ships a small hardcoded seed set. Production substitutes a full MMLU / GSM8K / HumanEval ngram store.
 - **Final-answer extraction robustness**: the updated regex correctly handles Qwen3's `<think>...</think>` format. If other teacher families (Llama-3, Mistral) emit different anchors, add patterns to `DEFAULT_FINAL_ANSWER_REGEX` in `lane.py`.
-- **Teacher catalog onchain commitment**: the teacher model allowlist needs to land as a `commit_policy_metadata` call once SN3 (Forge) ownership lands. Uses the existing chain adapter primitive from the reliquary-inference Tier 1 Epic 5.
+- **Teacher catalog onchain commitment**: the teacher model allowlist needs to land as a `commit_policy_metadata` call once Forge runtime ownership lands. Uses the existing chain adapter primitive from the reliquary-inference Tier 1 Epic 5.

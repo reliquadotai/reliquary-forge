@@ -5,7 +5,8 @@
 # Reliquary Forge
 
 **Reliquary Forge** is the trainer-quorum runtime for [Reliquary](https://github.com/0xgrizz/reliquary-inference),
-a two-subnet Bittensor platform for proof-carrying AI training. Forge consumes
+a proof-carrying Bittensor subnet that runs two companion protocols under a
+single netuid: **Ledger** (inference) and **Forge** (training). Forge consumes
 **verified rollout groups** from the live [Ledger runtime](https://github.com/0xgrizz/reliquary-inference)
 and turns them into policy checkpoints through dual-lane training:
 
@@ -17,8 +18,8 @@ and turns them into policy checkpoints through dual-lane training:
   provenance and quality, packers export deterministic datasets, and learners
   produce student checkpoints.
 
-Forge and its sibling Ledger share a [protocol package](https://github.com/0xgrizz/reliquary-protocol)
-so the two subnets cross-verify deterministically.
+Forge and its companion Ledger share a [protocol package](https://github.com/0xgrizz/reliquary-protocol)
+so the two runtimes cross-verify deterministically inside the same subnet.
 
 ## Live Status
 
