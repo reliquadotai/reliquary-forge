@@ -1,17 +1,41 @@
-# Reliquary
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Reliquary is a verified subnet platform for decentralized post-training. It treats **verified experience** as the commodity:
+# Reliquary Forge
 
-- **Distillation lane**: miners generate reasoning traces, validators verify provenance and quality, packers export deterministic datasets, and learners produce student checkpoints.
-- **RL lane**: finalized reasoning trajectories are imported from the live inference runtime, grouped into RL batches, and trained by a benchmark-gated trainer quorum.
+**Reliquary Forge** is the trainer-quorum runtime for [Reliquary](https://github.com/0xgrizz/reliquary-inference),
+a two-subnet Bittensor platform for proof-carrying AI training. Forge consumes
+**verified rollout groups** from the live [Ledger runtime](https://github.com/0xgrizz/reliquary-inference)
+and turns them into policy checkpoints through dual-lane training:
 
-This repo contains the broader platform surface:
+- **RL lane (live)**: DAPO/GRPO on zone-filtered rollout groups from Ledger's
+  4-validator mesh — PPO-clipped surrogate + KL penalty against a frozen
+  reference, published as `CheckpointAttestation + PolicyCommitment` that
+  miners hot-swap at the effective window boundary.
+- **Distillation lane**: miners generate reasoning traces, validators verify
+  provenance and quality, packers export deterministic datasets, and learners
+  produce student checkpoints.
 
-- verified distillation roadmap
-- commodity-data ingestion from the live inference runtime
-- verified RL roadmap with trainer-quorum execution
-- learner and policy-authority architecture
-- control-plane and durable-node deployment work
+Forge and its sibling Ledger share a [protocol package](https://github.com/0xgrizz/reliquary-protocol)
+so the two subnets cross-verify deterministically.
+
+## Live Status
+
+- **Live closed-loop bridge** to Ledger netuid 462 — `scripts/run_forge_grpo_live.py`
+  runs autonomously every 60 min via systemd timer
+- **GRPO trainer** on zone-filtered groups (σ ≥ 0.33 bootstrap gate) with
+  PPO clip ε=0.2, KL β=0.04 (k3 estimator), AdamW lr=5e-7
+- **Cursor-memoised R2 scan** — per-cycle R2 cost dropped from ~900 gets to
+  ~10 in steady state (20 min → 1.5 min cycle time)
+- **Partial-seal gates**: drop σ=0 groups upfront + skip publishing deltas
+  below a configurable `min_mean_abs_delta` threshold
+- **R2 state mirror + auto-restore** — node rebuild no longer resets
+  `last_trained_window`
+- **First autonomous GRPO delta published**: `forge-grpo-1776864812` (merkle
+  `87b30c85…`), with downstream `policy_consumer` applying it on Ledger
+  miners within one window
+- See [live operator guide](docs/rtx6000b-deployment.md) and the
+  [closed-loop bridge spec](docs/architecture.md)
 
 ## Architecture
 
