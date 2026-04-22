@@ -479,8 +479,10 @@ def main() -> int:
     )
     parser.add_argument(
         "--min-new-groups",
+        "--min-new-pairs",  # wrapper-compat alias — the shared run-forge-training-cycle.sh passes --min-new-pairs.
         type=int,
         default=4,
+        dest="min_new_groups",
         help="Skip the cycle if fewer than this many new in-zone groups since last run.",
     )
     parser.add_argument(
