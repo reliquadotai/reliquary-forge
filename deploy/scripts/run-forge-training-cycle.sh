@@ -31,12 +31,22 @@ fi
 TRAIN_SCRIPT="${FORGE_TRAIN_SCRIPT:-/opt/reliquary-repos/reliquary/scripts/run_forge_train_live.py}"
 STATE_FILE="${FORGE_TRAINER_STATE:-$STATE_ROOT/forge-trainer-state.json}"
 MIN_NEW_PAIRS="${FORGE_MIN_NEW_PAIRS:-16}"
+# Partial-seal floor — single-group GRPO cycles produce updates around
+# the 1e-9 mean-abs-delta range (one prompt × M=8 rollouts → one
+# AdamW step → ~1e-7 weight movement after Adam scaling on a model
+# this size is rare). The 1e-7 default was tuned for full B_BATCH=8
+# group cycles and silently filters legitimate updates when the live
+# task_count=1 path delivers fewer groups per cycle. Lower by default
+# so smaller-cohort cycles still publish; numerical-noise-only updates
+# (~1e-12) still get filtered.
+MIN_MEAN_ABS_DELTA="${FORGE_MIN_MEAN_ABS_DELTA:-1e-9}"
 
 {
   echo "=== $(date -u +%FT%TZ) — training cycle start ==="
   "$VENV/bin/python" "$TRAIN_SCRIPT" \
     --state-file "$STATE_FILE" \
-    --min-new-pairs "$MIN_NEW_PAIRS"
+    --min-new-pairs "$MIN_NEW_PAIRS" \
+    --min-mean-abs-delta "$MIN_MEAN_ABS_DELTA"
   RC=$?
   echo "=== $(date -u +%FT%TZ) — exit=$RC ==="
   exit $RC
