@@ -10,9 +10,18 @@ ConditionPathExists=/opt/reliquary-secrets/signing-secret
 [Service]
 Type=oneshot
 User=root
+# 100 problems is the sustainable cadence baseline for the 120-min
+# timer interval — a full 500-problem run on RTX6000B takes ~3 hours
+# at ~15 s/problem with max_new_tokens=1024 (verified empirically on
+# 2026-04-25; the original 500-problem run was killed by the previous
+# 1h timeout). Operators wanting a deeper periodic baseline can override
+# via FORGE_EVAL_MAX_PROBLEMS=500 + a slower OnUnitActiveSec on a
+# parallel timer unit.
+Environment=FORGE_EVAL_MAX_PROBLEMS=100
 ExecStart=/opt/reliquary-deploy/run-forge-eval-cycle.sh
 Restart=no
-# Eval on 500 problems with max_new_tokens=1024 on Blackwell runs in
-# ~15-25 min for Qwen2.5-3B. Give headroom for slower hardware + HF
-# cold-cache downloads on first run.
-TimeoutStartSec=3600
+# 7200s = 2h headroom. 100 problems on RTX6000B finishes well under
+# that; the budget is sized so even a slow cold-cache + transient R2
+# blip doesn't trigger a kill. If the cycle ever exceeds 2h that
+# itself is a regression worth alerting on.
+TimeoutStartSec=7200
