@@ -60,15 +60,6 @@ for the Ledger side.
    (Ledger + Forge on one netuid) is the canonical target; the
    production cadence will be announced when the 4-week track record is in.
 
-## The policy on governance
-
-No single entity. The policy-authority hotkey is HMAC-signed and
-rotated via the subnet identity commit interface. Upgrades require a
-coordinated `reliquary-protocol` version bump + 24h testnet bake +
-on-chain commit of upgrade intent before cutover. Anti-centralization
-is a protocol invariant enforced by the validator mesh, not a
-marketing claim.
-
 ## Get involved
 
 - **Run a Ledger miner or validator** on netuid 462: see the
