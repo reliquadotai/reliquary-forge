@@ -4,7 +4,7 @@ Reliquary’s RL lane now treats finalized reasoning trajectories as the primary
 
 ## Data Path
 
-1. `reliquary-inference` finalizes a reasoning window.
+1. `reliquary-ledger` finalizes a reasoning window.
 2. The finalized `window_manifest`, `task_batch`, completion bundles, verdict bundle, and scorecard remain the source of truth.
 3. `InferenceRegistryAdapter` reads those artifacts from either:
    - a same-host local registry root

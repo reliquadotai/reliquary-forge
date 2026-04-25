@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to **Reliquary Forge** (`reliquary`) are documented
+All notable changes to **Reliquary Forge** (`reliquary-forge`) are documented
 here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 we version jointly with
 [reliquary-protocol](https://github.com/reliquadotai/reliquary-protocol) so both

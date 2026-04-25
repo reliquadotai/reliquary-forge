@@ -34,10 +34,10 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/reliquadotai/reliquary"
-Repository = "https://github.com/reliquadotai/reliquary"
-Issues = "https://github.com/reliquadotai/reliquary/issues"
-Changelog = "https://github.com/reliquadotai/reliquary/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/reliquadotai/reliquary-forge"
+Repository = "https://github.com/reliquadotai/reliquary-forge"
+Issues = "https://github.com/reliquadotai/reliquary-forge/issues"
+Changelog = "https://github.com/reliquadotai/reliquary-forge/blob/main/CHANGELOG.md"
 dependencies = [
     "typer==0.16.1",
     "rich==14.1.0",
