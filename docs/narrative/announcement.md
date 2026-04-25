@@ -49,16 +49,14 @@ for the Ledger side.
 1. **Continuous-operation track record.** Forge needs to land signed
    deltas through the bridge for ≥ 4 weeks with no single-point
    failure. In progress.
-2. **External review of the protocol paper.** Cryptographer audit of
-   the sketch-proof + bridge-envelope + HMAC design.
-3. **Distillation lane live.** Teacher catalog, trace artifacts,
+2. **Distillation lane live.** Teacher catalog, trace artifacts,
    contamination screening, packer, learner promotion. Scaffolding
    exists; production wiring is the next major epic.
-4. **Permissionless environment registry.** Authors can submit a
+3. **Permissionless environment registry.** Authors can submit a
    sandboxed task-generator + reward-function spec; validators vote
    acceptance; stake-backed sponsors. Design lives in
    [`docs/lightweight-inference-subnet-blueprint.md`](../lightweight-inference-subnet-blueprint.md).
-5. **Mainnet Forge at production cadence.** The dual-protocol design
+4. **Mainnet Forge at production cadence.** The dual-protocol design
    (Ledger + Forge on one netuid) is the canonical target; the
    production cadence will be announced when the 4-week track record is in.
 
