@@ -2,7 +2,7 @@
 
 Forge is the trainer-quorum runtime for Reliquary, a proof-carrying
 Bittensor subnet that runs two companion protocols under a single netuid.
-Where [Ledger](https://github.com/0xgrizz/reliquary-inference)
+Where [Ledger](https://github.com/reliquadotai/reliquary-inference)
 produces **verifiable completions**, Forge turns them into **policy
 checkpoints** that flow back to Ledger miners through a signed
 closed-loop bridge.

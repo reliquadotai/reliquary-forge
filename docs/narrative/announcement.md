@@ -2,7 +2,7 @@
 
 **2026-04-22.** Reliquary Forge, the trainer-quorum runtime that runs as a
 companion protocol alongside Ledger on a single subnet, is live on the testnet
-closed-loop bridge with its companion [Ledger](https://github.com/0xgrizz/reliquary-inference) (netuid 462).
+closed-loop bridge with its companion [Ledger](https://github.com/reliquadotai/reliquary-inference) (netuid 462).
 
 ## What Forge does
 
@@ -39,9 +39,9 @@ Ledger mine → mesh verify → zone filter (σ ≥ 0.33) →
 
 ## What's on the other side of the bridge
 
-[Ledger](https://github.com/0xgrizz/reliquary-inference) has the inference
+[Ledger](https://github.com/reliquadotai/reliquary-inference) has the inference
 half: GRAIL sketch proofs, 9-stage verifier pipeline, DAPO zone filter,
-mesh consensus. See its [launch announcement](https://github.com/0xgrizz/reliquary-inference/blob/main/docs/narrative/announcement.md)
+mesh consensus. See its [launch announcement](https://github.com/reliquadotai/reliquary-inference/blob/main/docs/narrative/announcement.md)
 for the Ledger side.
 
 ## Roadmap to mainnet
@@ -72,16 +72,16 @@ marketing claim.
 ## Get involved
 
 - **Run a Ledger miner or validator** on netuid 462: see the
-  [miner](https://github.com/0xgrizz/reliquary-inference/blob/main/docs/miner-quickstart.md)
-  and [validator](https://github.com/0xgrizz/reliquary-inference/blob/main/docs/validator-quickstart.md)
+  [miner](https://github.com/reliquadotai/reliquary-inference/blob/main/docs/miner-quickstart.md)
+  and [validator](https://github.com/reliquadotai/reliquary-inference/blob/main/docs/validator-quickstart.md)
   quickstarts.
 - **Inspect Forge cycles** via the live dashboard on any Ledger
   validator (`:9108/`) or the audit index at
   [`audit/index.html`](https://pub-954f95c7d2f3478886c8a8ff7a4946e0.r2.dev/audit/index.html).
 - **Read the protocol paper**:
-  [`reliquary-inference/docs/paper/reliquary_protocol_paper.md`](https://github.com/0xgrizz/reliquary-inference/blob/main/docs/paper/reliquary_protocol_paper.md).
+  [`reliquary-inference/docs/paper/reliquary_protocol_paper.md`](https://github.com/reliquadotai/reliquary-inference/blob/main/docs/paper/reliquary_protocol_paper.md).
   Section 9 covers the DAPO zone filter, GRPO update rule, cooldown,
   and reparam-trick guard.
 - **Contribute**: PRs, issues, bug reports welcome on either
-  [`reliquary`](https://github.com/0xgrizz/reliquary) (this repo) or
-  [`reliquary-inference`](https://github.com/0xgrizz/reliquary-inference).
+  [`reliquary`](https://github.com/reliquadotai/reliquary) (this repo) or
+  [`reliquary-inference`](https://github.com/reliquadotai/reliquary-inference).

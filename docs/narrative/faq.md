@@ -5,7 +5,7 @@
 The trainer-quorum runtime for Reliquary, a proof-carrying Bittensor subnet
 that runs two companion protocols under a single netuid. Forge consumes
 verified rollout groups from
-[Ledger](https://github.com/0xgrizz/reliquary-inference) (netuid 462) and
+[Ledger](https://github.com/reliquadotai/reliquary-inference) (netuid 462) and
 publishes policy deltas back through a cryptographically signed
 closed-loop bridge.
 
@@ -43,7 +43,7 @@ DAPO/GRPO on zone-filtered rollout groups.
 - **Optimizer**: AdamW at lr = 5e-7, gradient clip 1.0.
 
 Full derivation in section 9 of the protocol paper at
-[`reliquary-inference/docs/paper/reliquary_protocol_paper.md`](https://github.com/0xgrizz/reliquary-inference/blob/main/docs/paper/reliquary_protocol_paper.md).
+[`reliquary-inference/docs/paper/reliquary_protocol_paper.md`](https://github.com/reliquadotai/reliquary-inference/blob/main/docs/paper/reliquary_protocol_paper.md).
 
 ## Why "zone filter"?
 
@@ -70,7 +70,7 @@ A signed on-chain commitment pattern:
    cached model at the effective window.
 
 All three artifacts use the canonical serialization from
-[reliquary-protocol](https://github.com/0xgrizz/reliquary-protocol)
+[reliquary-protocol](https://github.com/reliquadotai/reliquary-protocol)
 so both runtimes cross-verify deterministically.
 
 ## What prevents a compromised Forge from poisoning Ledger?

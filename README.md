@@ -1,13 +1,13 @@
-[![CPU CI](https://github.com/0xgrizz/reliquary/actions/workflows/cpu-ci.yml/badge.svg)](https://github.com/0xgrizz/reliquary/actions/workflows/cpu-ci.yml)
+[![CPU CI](https://github.com/reliquadotai/reliquary/actions/workflows/cpu-ci.yml/badge.svg)](https://github.com/reliquadotai/reliquary/actions/workflows/cpu-ci.yml)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 # Reliquary Forge
 
-**Reliquary Forge** is the trainer-quorum runtime for [Reliquary](https://github.com/0xgrizz/reliquary-inference),
+**Reliquary Forge** is the trainer-quorum runtime for [Reliquary](https://github.com/reliquadotai/reliquary-inference),
 a proof-carrying Bittensor subnet that runs two companion protocols under a
 single netuid: **Ledger** (inference) and **Forge** (training). Forge consumes
-**verified rollout groups** from the live [Ledger runtime](https://github.com/0xgrizz/reliquary-inference)
+**verified rollout groups** from the live [Ledger runtime](https://github.com/reliquadotai/reliquary-inference)
 and turns them into policy checkpoints through dual-lane training:
 
 - **RL lane (live)**: DAPO/GRPO on zone-filtered rollout groups from Ledger's
@@ -18,7 +18,7 @@ and turns them into policy checkpoints through dual-lane training:
   provenance and quality, packers export deterministic datasets, and learners
   produce student checkpoints.
 
-Forge and its companion Ledger share a [protocol package](https://github.com/0xgrizz/reliquary-protocol)
+Forge and its companion Ledger share a [protocol package](https://github.com/reliquadotai/reliquary-protocol)
 so the two runtimes cross-verify deterministically inside the same subnet.
 
 ## Live Status
