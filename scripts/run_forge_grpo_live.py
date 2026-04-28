@@ -67,6 +67,89 @@ from reliquary.training.policy_attestation import (
     publish_attestation,
 )
 
+
+def _maybe_hf_publish(
+    *,
+    model: Any,
+    tokenizer: Any,
+    current_window: int,
+    signing_secret: str,
+) -> None:
+    """Side-channel snapshot push to Hugging Face Hub (Phase 1.4).
+
+    Reads ``RELIQUARY_HF_REPO_ID``, ``RELIQUARY_HF_TOKEN``, and
+    ``RELIQUARY_HF_PUBLISH_INTERVAL_WINDOWS`` from env. When the
+    publish-interval boundary aligns with the current window, the
+    in-memory post-trained model is dumped to a temp dir and pushed
+    asynchronously. Never blocks the trainer: ``maybe_publish``
+    returns a Future, and on any exception we log + continue.
+    """
+    repo_id = os.environ.get("RELIQUARY_HF_REPO_ID", "").strip()
+    if not repo_id:
+        return
+    interval_raw = os.environ.get("RELIQUARY_HF_PUBLISH_INTERVAL_WINDOWS", "10").strip()
+    try:
+        interval = max(1, int(interval_raw))
+    except ValueError:
+        log(f"  hf_hub_publisher: invalid interval {interval_raw!r}, skipping")
+        return
+    window_n = max(0, int(current_window))
+    if window_n == 0 or window_n % interval != 0:
+        return
+    token = os.environ.get("RELIQUARY_HF_TOKEN") or None
+    try:
+        from reliquary.training.hf_hub_publisher import HfHubPublisher
+    except Exception as exc:  # missing huggingface_hub or import error
+        log(f"  hf_hub_publisher: import failed ({exc}); skipping")
+        return
+    import tempfile
+    from pathlib import Path
+
+    snapshot_dir = Path(tempfile.mkdtemp(prefix="reliquary-hf-snap-"))
+    try:
+        log(f"  hf_hub_publisher: serialising snapshot to {snapshot_dir}")
+        model.save_pretrained(str(snapshot_dir))
+        tokenizer.save_pretrained(str(snapshot_dir))
+        publisher = HfHubPublisher(
+            repo_id=repo_id,
+            token=token,
+            signing_secret=signing_secret,
+            interval_windows=interval,
+        )
+        future = publisher.maybe_publish(
+            window_n=window_n,
+            snapshot_dir=snapshot_dir,
+            commit_message=f"reliquary-forge sn462 trainer cycle (window {window_n})",
+        )
+        if future is None:
+            log(
+                "  hf_hub_publisher: scheduling skipped "
+                f"(window={window_n} interval={interval})"
+            )
+            return
+        # Block briefly so the operator log shows success/failure inline;
+        # the executor still runs the upload off the main path so the
+        # trainer's exit isn't gated by network latency beyond this wait.
+        try:
+            result = future.result(timeout=600)
+            log(
+                f"  hf_hub_publisher: published checkpoint_n={result.checkpoint_n} "
+                f"revision={result.revision[:12]}"
+            )
+        except Exception as exc:
+            log(f"  hf_hub_publisher: publish failed ({exc})")
+        finally:
+            publisher.shutdown(wait=False)
+    finally:
+        # Best-effort cleanup. The HF SDK has already uploaded the
+        # bytes (or has failed); we don't need this dir any more.
+        try:
+            import shutil
+
+            shutil.rmtree(snapshot_dir, ignore_errors=True)
+        except Exception:
+            pass
+
 # ---------------------------------------------------------------------------
 # Config — GRPO canonical hyperparameters + Qwen2.5-3B model details
 # ---------------------------------------------------------------------------
@@ -972,6 +1055,13 @@ def main() -> int:
     log(
         f"  state written: last_trained_window={state.get('last_trained_window')} "
         f"(r2 backup: {args.state_r2_key})"
+    )
+
+    _maybe_hf_publish(
+        model=model,
+        tokenizer=tokenizer,
+        current_window=current_window,
+        signing_secret=signing_secret,
     )
 
     print("SUMMARY:", flush=True)
