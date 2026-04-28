@@ -1,0 +1,56 @@
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+Connecting to container wrk-nyfmqa78r5ld-994db9b-stnnz...
+{
+  "model": "Qwen/Qwen2.5-3B-Instruct",
+  "n_prompts": 24,
+  "max_new_tokens": 80,
+  "perturbation_sigma": 0.0001,
+  "perturbed_weight": "model.layers.0.mlp.gate_proj.weight",
+  "elapsed_honest_seconds": 92.3,
+  "elapsed_total_seconds": 176.4,
+  "current_constants": {
+    "PROOF_SKETCH_TOLERANCE_BASE": 6000,
+    "PROOF_SKETCH_TOLERANCE_GROWTH": 5.0
+  },
+  "honest_sketch_diff": {
+    "n": 768,
+    "max": 0.0,
+    "p99": 0.0,
+    "p95": 0.0,
+    "p50": 0.0,
+    "median": 0.0
+  },
+  "honest_lp_diff": {
+    "n": 755,
+    "max": 0.0,
+    "p99": 0.0,
+    "p95": 0.0,
+    "p50": 0.0
+  },
+  "cheater_sketch_diff": {
+    "n": 704,
+    "max": 2147483522.0,
+    "p99": 2147483181.6,
+    "p95": 2147481351.25,
+    "p50": 0.0,
+    "median": 0.0
+  },
+  "cheater_lp_diff": {
+    "n": 696,
+    "max": 0.28125,
+    "p99": 0.171875,
+    "p95": 0.09375,
+    "p50": 2.0503997802734375e-05
+  },
+  "recommended": {
+    "PROOF_SKETCH_TOLERANCE_BASE": 100,
+    "LOGPROB_DRIFT_THRESHOLD": 0.005,
+    "sketch_floor_honest_max": 0.0,
+    "sketch_ceil_cheater_p95": 2147481351.25,
+    "lp_floor_honest_max": 0.0,
+    "lp_ceil_cheater_p95": 0.09375,
+    "rule": "max(4 * honest_max + 100, 100); cap at cheater_p95/2 to ensure cheater detection"
+  }
+}
