@@ -1,11 +1,12 @@
 """Continuous HF Hub checkpoint publishing — side-channel beside delta-to-R2.
 
-Phase 1.4 of the parallel-harvest plan: every N windows the trainer pushes
-the full HF-format snapshot of the trained model to a public Hugging
-Face repository. Miners and downstream consumers can ``snapshot_download``
-directly from there for ecosystem use; the Reliquary protocol still uses
-the delta-checkpoint + signed PolicyCommitment flow as the source of
-truth for in-subnet policy installation.
+Phase 1.4 of the parallel-harvest plan: every N windows the trainer
+pushes the full HF-format snapshot of the trained model to a public
+Hugging Face repository. Miners and downstream consumers can
+``snapshot_download`` directly from there for ecosystem use; the
+Reliquary protocol still uses the delta-checkpoint + signed
+PolicyCommitment flow as the source of truth for in-subnet policy
+installation.
 
 Design notes:
 
@@ -24,8 +25,8 @@ Design notes:
   upload happens off-thread, and ``last_manifest()`` returns the most
   recent successful publish (with revision sha) once it lands.
 
-Parallel-work credit: romain13190/reliquary@0b9795d. the upstream pattern
-(every-N-windows full HF snapshot, signed manifest, miner-side
+Parallel-work credit: romain13190/reliquary@0b9795d. The upstream
+pattern (every-N-windows full HF snapshot, signed manifest, miner-side
 ``snapshot_download`` on revision change) is what we adopt. The signing
 flow uses our protocol package's HMAC primitives; the dependency
 injection (``api`` + ``thread_pool``) is independent.

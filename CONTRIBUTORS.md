@@ -11,7 +11,7 @@ companion repos:
 ## Maintainers
 
 - [@0xgrizz](https://github.com/0xgrizz)
-- [@0xShonen](https://github.com/0xShonen)
+- [@0xgrizz](https://github.com/0xgrizz) (formerly active under another GitHub alias on early commits)
 
 ## Acknowledgments
 
@@ -30,7 +30,7 @@ are independent Reliquary additions.
 [romain13190](https://github.com/romain13190) has been independently
 iterating on a parallel SN81 implementation at
 [romain13190/reliquary](https://github.com/romain13190/reliquary). Forge
-adopts the following ideas from his repo with explicit per-commit
+adopts the following ideas from that repo with explicit per-commit
 attribution:
 
 - W&B richer training-config logging (lr, kl_beta, ppo_clip, etc.)

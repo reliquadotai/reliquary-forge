@@ -400,9 +400,9 @@ def pull_training_groups(
             completion_id = str(c.get("artifact_id") or "")
             reward = correctness_by_cid.get(completion_id, 0.0)
             # Miner's payload uses `completion_logprobs` (see
-            # reliquary_inference/miner/engine.py:291). Older Romain-
-            # derived code called it `token_logprobs`; support both so
-            # we're compatible with either miner build.
+            # reliquary_inference/miner/engine.py:291). Older
+            # upstream-derived code called it `token_logprobs`;
+            # support both so we're compatible with either miner build.
             logprobs = (
                 payload.get("completion_logprobs")
                 or payload.get("token_logprobs")
