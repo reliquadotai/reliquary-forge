@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import logging
+import os
+from pathlib import Path
 from typing import Any
 
 from ..envs.sat import generate_sat_challenge
@@ -12,6 +15,95 @@ from ..training.grpo import build_grpo_groups
 from ..training.ray_cluster import evaluate_reasoning_checkpoint_remote
 from ..utils.json_io import write_json
 from .policy_authority import make_policy_authority_decision
+
+_logger = logging.getLogger(__name__)
+
+
+def _hf_hub_publisher_for(cfg: dict[str, Any]):
+    """Return a process-level singleton ``HfHubPublisher`` if env-configured.
+
+    Phase 1.4 wiring. Reads ``RELIQUARY_HF_REPO_ID``, ``RELIQUARY_HF_TOKEN``,
+    ``RELIQUARY_HF_PUBLISH_INTERVAL_WINDOWS``, and the trainer's HMAC secret
+    (``RELIQUARY_HF_SIGNING_SECRET`` falls back to ``RELIQUARY_MINER_SECRET``
+    or ``RELIQUARY_TRAINER_SECRET``).
+
+    Returns ``None`` if no repo is configured (publisher disabled).
+    Returns a cached instance on subsequent calls so the executor + state
+    survive across windows.
+    """
+    repo_id = os.environ.get("RELIQUARY_HF_REPO_ID", "").strip()
+    if not repo_id:
+        return None
+    cached = cfg.get("_hf_hub_publisher")
+    if cached is not None:
+        return cached
+    token = os.environ.get("RELIQUARY_HF_TOKEN") or None
+    interval_raw = os.environ.get("RELIQUARY_HF_PUBLISH_INTERVAL_WINDOWS", "10").strip()
+    try:
+        interval = max(1, int(interval_raw))
+    except ValueError:
+        interval = 10
+    signing_secret = (
+        os.environ.get("RELIQUARY_HF_SIGNING_SECRET")
+        or os.environ.get("RELIQUARY_TRAINER_SECRET")
+        or os.environ.get("RELIQUARY_MINER_SECRET")
+        or "local-trainer-secret"
+    )
+    try:
+        from ..training.hf_hub_publisher import HfHubPublisher
+        publisher = HfHubPublisher(
+            repo_id=repo_id,
+            token=token,
+            signing_secret=signing_secret,
+            interval_windows=interval,
+        )
+    except Exception as exc:  # pragma: no cover - defensive
+        _logger.warning("hf_hub_publisher disabled: %s", exc)
+        return None
+    cfg["_hf_hub_publisher"] = publisher
+    _logger.info(
+        "hf_hub_publisher enabled: repo=%s interval=%d windows", repo_id, interval
+    )
+    return publisher
+
+
+def _maybe_publish_to_hf_hub(
+    cfg: dict[str, Any],
+    *,
+    window_n: int,
+    snapshot_dir: str,
+) -> dict[str, Any] | None:
+    """Phase 1.4 hook: maybe push a full HF snapshot every N windows.
+
+    Returns a serializable manifest dict on schedule (so callers can write
+    it into a checkpoint_artifact field for downstream use) or ``None``.
+
+    Non-blocking: the actual upload runs off-thread via the publisher's
+    executor. We return immediately with a dict whose ``status`` says
+    ``scheduled`` and a future-result placeholder; the trainer can ignore
+    the future.
+    """
+    publisher = _hf_hub_publisher_for(cfg)
+    if publisher is None:
+        return None
+    snapshot_path = Path(snapshot_dir)
+    if not snapshot_path.exists() or not snapshot_path.is_dir():
+        _logger.warning(
+            "hf_hub_publisher: skipping window %d, snapshot dir missing: %s",
+            window_n,
+            snapshot_dir,
+        )
+        return None
+    future = publisher.maybe_publish(window_n=window_n, snapshot_dir=snapshot_path)
+    if future is None:
+        return None
+    return {
+        "status": "scheduled",
+        "window_n": window_n,
+        "snapshot_dir": str(snapshot_path),
+        "repo_id": publisher.repo_id,
+        "interval_windows": publisher.interval_windows,
+    }
 
 
 def _active_env_id(cfg: dict[str, Any], env_id: str | None = None) -> str:
@@ -354,6 +446,15 @@ def train_window(
     )
     checkpoint_path = str(training_summary.get("checkpoint_path", checkpoint_dir))
     write_json(checkpoint_dir / "training_summary.json", training_summary)
+
+    # Phase 1.4 side-channel: every N=10 windows push a full HF snapshot
+    # to the public Hugging Face repo (if RELIQUARY_HF_REPO_ID is set).
+    # Non-blocking — the publisher's executor handles the upload.
+    hf_publish = _maybe_publish_to_hf_hub(
+        cfg, window_n=window_id + 1, snapshot_dir=checkpoint_path,
+    )
+    if hf_publish is not None:
+        write_json(checkpoint_dir / "hf_publish.json", hf_publish)
 
     after_eval = _evaluate_rl_model(
         cfg=cfg,
