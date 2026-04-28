@@ -1,51 +1,85 @@
+# Reliquary Forge — operator compose file.
+#
+# Quickstart (testnet 462):
+#   cp env.testnet.example .env  # then edit netuid, R2 creds, wallet path
+#   export BT_WALLETS_DIR=$HOME/.bittensor/wallets
+#   docker compose up -d trainer        # GRPO RL worker, closed-loop to Ledger
+#
+# Auto-update opt-in: also run docker/docker-compose.watchtower.yml from the
+# Ledger repo (single Watchtower polls both registries).
+
 services:
-  miner:
-    build: .
-    container_name: reliquary-miner
-    env_file:
-      - .env
-    environment:
-      - RELIQUARY_DATA_DIR=/app/data
-    command: ["reliquary", "mine", "--window", "0"]
-    volumes:
-      - reliquary-data:/app/data
-    restart: "no"
-
-  validator:
-    build: .
-    container_name: reliquary-validator
-    env_file:
-      - .env
-    environment:
-      - RELIQUARY_DATA_DIR=/app/data
-    command: ["reliquary", "validate", "--window", "0"]
-    volumes:
-      - reliquary-data:/app/data
-    restart: "no"
-
   trainer:
+    image: ghcr.io/reliquadotai/reliquary-forge:latest
     build: .
-    container_name: reliquary-trainer
-    env_file:
-      - .env
+    container_name: reliquary-forge-trainer
+    restart: unless-stopped
+    env_file: .env
     environment:
-      - RELIQUARY_DATA_DIR=/app/data
-    command: ["reliquary", "train", "--window", "0"]
+      RELIQUARY_FORGE_ROLE: trainer
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     volumes:
-      - reliquary-data:/app/data
-    restart: "no"
+      - type: bind
+        source: ${BT_WALLETS_DIR:?set BT_WALLETS_DIR to the host path of your wallets/}
+        target: /root/.bittensor/wallets
+        read_only: true
+      - reliquary-forge-state:/opt/reliquary-forge/data
+      - hf-cache:/root/.cache/huggingface
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'reliquary run-rl-worker' >/dev/null || exit 1"]
+      interval: 60s
+      timeout: 5s
+      retries: 4
+      start_period: 300s
+    # Trainers publish weights via signed PolicyCommitment envelopes; auto-
+    # update is opt-in only. Operator must flip this to "true" if they want
+    # Watchtower-managed rollouts.
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
 
-  demo:
+  distill:
+    image: ghcr.io/reliquadotai/reliquary-forge:latest
     build: .
-    container_name: reliquary-demo
-    env_file:
-      - .env
+    container_name: reliquary-forge-distill
+    restart: unless-stopped
+    env_file: .env
     environment:
-      - RELIQUARY_DATA_DIR=/app/data
-    command: ["reliquary", "demo", "showcase"]
+      RELIQUARY_FORGE_ROLE: distill
+      RELIQUARY_DISTILL_WINDOWS: "2"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     volumes:
-      - reliquary-data:/app/data
+      - type: bind
+        source: ${BT_WALLETS_DIR:?set BT_WALLETS_DIR to the host path of your wallets/}
+        target: /root/.bittensor/wallets
+        read_only: true
+      - reliquary-forge-state:/opt/reliquary-forge/data
+      - hf-cache:/root/.cache/huggingface
+    profiles: ["distill"]
+
+  showcase:
+    image: ghcr.io/reliquadotai/reliquary-forge:latest
+    build: .
+    container_name: reliquary-forge-showcase
+    env_file: .env
+    environment:
+      RELIQUARY_FORGE_ROLE: showcase
+    volumes:
+      - reliquary-forge-state:/opt/reliquary-forge/data
+    profiles: ["demo"]
     restart: "no"
 
 volumes:
-  reliquary-data:
+  reliquary-forge-state:
+  hf-cache:
