@@ -14,10 +14,22 @@ htmlcov/
 .env
 .env.local
 .env.*.local
+*.env
+!env.example
+!env.testnet.example
+!deploy/reliquary-node.env.example
 .venv/
 venv/
 .python-version
 .claude/
+
+# Wallets and key material — never commit
+wallets/
+secrets/
+*.pem
+*.key
+id_rsa*
+*.sealed
 
 # Build artifacts
 build/

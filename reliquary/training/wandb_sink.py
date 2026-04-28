@@ -39,6 +39,56 @@ class WandbClient(Protocol):
     def finish(self, *args: Any, **kwargs: Any) -> None: ...
 
 
+_TRAINING_CONFIG_KEYS: tuple[str, ...] = (
+    # Core GRPO hyperparameters
+    "learning_rate",
+    "kl_beta",
+    "ppo_clip_epsilon",
+    "grad_clip_norm",
+    "lr_warmup_windows",
+    "lr_cosine_max_windows",
+    # Batch shape
+    "b_batch",
+    "m_rollouts_per_prompt",
+    "window_length",
+    # Versioning
+    "wandb_training_version",
+    "reliquary_version",
+    # Optional context
+    "model_ref",
+    "netuid",
+    "task_source",
+)
+
+
+def build_training_config(
+    cfg: dict[str, Any] | None = None,
+    *,
+    reliquary_version: str | None = None,
+    wandb_training_version: str = "v1",
+    extra: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Project a trainer cfg dict + version strings to a stable W&B config shape.
+
+    Filters to ``_TRAINING_CONFIG_KEYS`` so unrelated runtime knobs don't
+    pollute the run config. Inspired by the per-step config logging
+    pattern from romain13190/reliquary commit b65085b (parallel-work
+    credit).
+    """
+    out: dict[str, Any] = {}
+    src = dict(cfg) if cfg else {}
+    for key in _TRAINING_CONFIG_KEYS:
+        if key in src:
+            out[key] = src[key]
+    if reliquary_version is not None:
+        out["reliquary_version"] = reliquary_version
+    out.setdefault("wandb_training_version", wandb_training_version)
+    if extra:
+        for key, value in extra.items():
+            out[key] = value
+    return out
+
+
 def _default_client() -> WandbClient:
     try:
         import wandb  # type: ignore[import-not-found]
@@ -121,6 +171,39 @@ class WandbSink:
             payload["step_seconds"] = float(step_seconds)
         self.client.log(payload, step=next_step)
 
+    def record_config(self, config: dict[str, Any]) -> None:
+        """Update the active run's config with hyperparameters.
+
+        If called before ``start()``, the config dict is merged into the
+        sink's own ``config`` attribute and applied at run init. If called
+        after ``start()``, the values are set on the active wandb run via
+        ``client.config.update`` if the client exposes it; otherwise they
+        are merged for visibility.
+
+        Mirrors the per-step + per-config logging pattern that lets
+        operators see lr, kl_beta, ppo_clip, etc. on the run page. Inspired
+        by romain13190/reliquary@b65085b (parallel-work credit).
+        """
+        if not self._active:
+            base = dict(self.config) if self.config else {}
+            base.update(config)
+            self.config = base
+            return
+        run_config = getattr(self._run, "config", None)
+        update = getattr(run_config, "update", None) if run_config is not None else None
+        if callable(update):
+            try:
+                update(dict(config), allow_val_change=True)
+                return
+            except TypeError:
+                update(dict(config))
+                return
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.warning("wandb config.update failed: %s", exc)
+        # Fallback: log config as a one-shot payload so it appears in the
+        # run history even if config.update is unavailable.
+        self.client.log({"config": dict(config)})
+
     def finish(self) -> None:
         """Mark the run finished; idempotent."""
         if not self._active:
@@ -136,4 +219,5 @@ __all__ = [
     "WandbClient",
     "WandbSink",
     "WandbUnavailableError",
+    "build_training_config",
 ]
