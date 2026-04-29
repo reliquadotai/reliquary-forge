@@ -222,7 +222,8 @@ FORGE_CURSOR_PATH_DEFAULT = "/opt/reliquary-state/forge-grpo-cursor.json"
 
 def _load_cursor(path: str) -> dict:
     try:
-        return json.load(open(path))
+        with open(path) as f:
+            return json.load(f)
     except FileNotFoundError:
         return {}
 
@@ -753,7 +754,8 @@ def make_target_tensor_names() -> list[str]:
 
 def _load_state(path: str) -> dict:
     try:
-        return json.load(open(path))
+        with open(path) as f:
+            return json.load(f)
     except FileNotFoundError:
         return {}
 

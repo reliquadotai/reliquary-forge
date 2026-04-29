@@ -8,6 +8,28 @@ Reliquary protocol still uses the delta-checkpoint + signed
 PolicyCommitment flow as the source of truth for in-subnet policy
 installation.
 
+Trust posture (audit finding #13):
+
+  * The on-chain ``PolicyCommitment.merkle_root`` plus the R2 delta
+    bundle it points at are the SOURCE OF TRUTH. Miners' and
+    validators' ``policy_consumer`` fetches deltas exclusively from
+    R2, verifies them against the HMAC-signed commitment, and only
+    then mutates the live model.
+  * The HF Hub snapshot is a CONVENIENCE MIRROR for the broader
+    ecosystem (downstream evaluation, fine-tuning, third-party
+    integrations). HF does not enforce our HMAC signature, so a
+    compromised ``RELIQUARY_HF_TOKEN`` lets an attacker push a
+    poisoned snapshot to the HF repo — but it does NOT cause any
+    miner or validator on-subnet to load those weights, because the
+    on-subnet consumer never reads from HF.
+  * Operators using ``--resume-from sha:<rev>`` against HF MUST
+    also pass ``--checksum-expected sha256:<hex>``. Without the
+    checksum the resume flow advances on whatever HF returned;
+    with the checksum the flow refuses to apply unless the
+    snapshot's canonical digest matches the expected value (which
+    the operator should derive from the on-chain attestation
+    or from a trusted internal record).
+
 Design notes:
 
 - ``huggingface_hub`` is bundled with the ``[ml]`` extra. If absent at

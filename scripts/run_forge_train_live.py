@@ -277,7 +277,8 @@ def run_sft_lora(
 
 def _load_state(path: str) -> dict:
     try:
-        return json.load(open(path))
+        with open(path) as f:
+            return json.load(f)
     except FileNotFoundError:
         return {}
 
