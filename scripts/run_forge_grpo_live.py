@@ -826,6 +826,22 @@ def main() -> int:
         help="GRPO optimiser steps this cycle (each step = B_BATCH groups).",
     )
     parser.add_argument(
+        "--min-distinct-miners",
+        type=int,
+        default=int(os.environ.get("RELIQUARY_FORGE_MIN_DISTINCT_MINERS", "2")),
+        help=(
+            "Anti-poison gate: refuse the cycle if fewer than N distinct "
+            "miner_ids appear across the assembled training set. Closes the "
+            "sybil + stake-majority trainer-poisoning attack vector — a "
+            "single miner crafting σ≈0.5 with [1,1,1,1,0,0,0,0] rewards can "
+            "pass the σ ≥ 0.43 zone filter and feed the trainer "
+            "half-poisoned data unless this gate trips. Default 2 (env: "
+            "RELIQUARY_FORGE_MIN_DISTINCT_MINERS); set 1 only on bootstrapping "
+            "windows with a single live miner — only safe when the operator "
+            "controls the miner."
+        ),
+    )
+    parser.add_argument(
         "--effective-at-offset-blocks",
         type=int,
         default=60,
@@ -919,6 +935,30 @@ def main() -> int:
             f"{args.min_new_groups}. Skipping cycle (exit 0, not an error)."
         )
         return 0
+
+    # Anti-poison gate: require ≥ N distinct miner_ids in the training
+    # set. Closes the sybil + stake-majority trainer-poisoning vector
+    # documented in the pre-cutover security audit (finding #7). A
+    # single miner crafting σ≈0.5 rewards can pass the zone filter and
+    # feed the trainer half-poisoned data — but if the trainer also
+    # requires multiple distinct submitters per cycle, the attacker
+    # has to coordinate enough hotkeys to also pass the validator
+    # mesh independently, which is the same hard problem mesh
+    # consensus already imposes. Skip here is a deliberate non-error.
+    distinct_miners = {g.miner_id for g in groups}
+    min_miners = max(1, int(args.min_distinct_miners))
+    if len(distinct_miners) < min_miners:
+        log(
+            f"  anti-poison gate: only {len(distinct_miners)} distinct "
+            f"miner(s) in {len(groups)} groups — need {min_miners}. "
+            f"Skipping cycle (exit 0, not an error)."
+        )
+        return 0
+    log(
+        f"  anti-poison gate: {len(distinct_miners)} distinct miner(s) "
+        f"across {len(groups)} groups (≥ {min_miners} required)"
+    )
+
     log(
         f"  training set: {len(groups)} groups, "
         f"{sum(len(g.rollouts) for g in groups)} total rollouts"
