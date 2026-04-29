@@ -10,9 +10,9 @@ The distillation lane's pure-Python core is unit-tested (16 tests in `tests/test
 
 | File | Role | Model | Hardware | Tasks | Date |
 |---|---|---|---|---|---|
-| [teacher_traces_qwen3_8b.json](teacher_traces_qwen3_8b.json) | teacher | `Qwen/Qwen3-8B` (vLLM at `127.0.0.1:8001`, `gpu-memory-utilization=0.65`, `enforce-eager`) | NVIDIA RTX PRO 6000 Blackwell (dev server, `wrk-mnmhkheic6r7`) | 4 | 2026-04-17 |
+| [teacher_traces_qwen3_8b.json](teacher_traces_qwen3_8b.json) | teacher | `Qwen/Qwen3-8B` (vLLM at `127.0.0.1:8001`, `gpu-memory-utilization=0.65`, `enforce-eager`) | NVIDIA RTX PRO 6000 Blackwell (dev server) | 4 | 2026-04-17 |
 | [student_completions_qwen3_8b.json](student_completions_qwen3_8b.json) | student (self-distill) | same vLLM endpoint, conditioned on each teacher trace | same hardware | 4 | 2026-04-17 |
-| [student_completions_qwen3_4b_staging1.json](student_completions_qwen3_4b_staging1.json) | **student (asymmetric)** | `Qwen/Qwen3-4B-Instruct-2507` via `transformers` in-process (`run_student_cycle_local`) | NVIDIA RTX PRO 6000 Blackwell (**staging1**, `wrk-j8nq3c7xn81v`) — distinct node from the teacher | 4 | 2026-04-17 |
+| [student_completions_qwen3_4b_staging1.json](student_completions_qwen3_4b_staging1.json) | **student (asymmetric)** | `Qwen/Qwen3-4B-Instruct-2507` via `transformers` in-process (`run_student_cycle_local`) | NVIDIA RTX PRO 6000 Blackwell (**staging1**, distinct node from the teacher) | 4 | 2026-04-17 |
 
 ## Run summary (2026-04-17)
 
@@ -38,7 +38,7 @@ Trace lengths: 2065 – 3681 characters each; all fit inside `max_tokens=2048`. 
 
 Using the same model family as teacher and student is a self-distillation configuration used to exercise the artifact pipeline end-to-end; production substitutes a smaller student (e.g. Qwen3-4B) on a different GPU.
 
-**Asymmetric run (2026-04-17, dedicated smaller student on a separate node):** Qwen3-4B-Instruct-2507 loaded in-process via `transformers` on staging1 Blackwell (`wrk-j8nq3c7xn81v`), conditioned on the same teacher trace JSON as above. All 4 student completions produced correct answers; all 4 provenance bindings resolve against the teacher catalog.
+**Asymmetric run (2026-04-17, dedicated smaller student on a separate node):** Qwen3-4B-Instruct-2507 loaded in-process via `transformers` on staging1 Blackwell, conditioned on the same teacher trace JSON as above. All 4 student completions produced correct answers; all 4 provenance bindings resolve against the teacher catalog.
 
 | Task | Asymmetric student final answer | Bound |
 |---|---|---|
