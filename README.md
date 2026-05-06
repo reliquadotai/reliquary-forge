@@ -2,6 +2,8 @@
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+> **Looking for the canonical Reliquary subnet?** The mainnet implementation lives at **[`reliquadotai/reliquary`](https://github.com/reliquadotai/reliquary)** (subnet 81). The canonical design is an event-driven GRPO market where miners compete on **prompt-selection intelligence** — predicting which prompts sit at the policy's learning frontier and earning batch slots when they pick well — rather than on rollout volume. This repo (`reliquary-forge`) hosts an earlier dual-lane (RL + distillation) trainer-quorum exploration that informed the canonical design; the GRPO trainer code + delta-checkpoint primitives are kept here for reference.
+
 # Reliquary Forge
 
 **Reliquary Forge** is the trainer-quorum runtime for [Reliquary](https://github.com/reliquadotai/reliquary-ledger),
