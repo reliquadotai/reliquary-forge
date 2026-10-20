@@ -5,9 +5,16 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      HF_HUB_OFFLINE: "1"
+      HF_DATASETS_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -16,8 +23,33 @@ jobs:
       - name: Install core test dependencies
         run: |
           python -m pip install --upgrade pip
+          python -m pip install torch==2.9.0 --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install "reliquary-protocol @ git+https://github.com/reliquadotai/reliquary-protocol@a54a79c3c327ec9002cf72b816ffb34ba54201e8"
           python -m pip install -e ".[dev]"
       - name: Compile Python
         run: python -m py_compile $(git ls-files '*.py')
       - name: Run tests
-        run: pytest -q
+        run: pytest -q --junitxml=test-results/unit.xml -o junit_logging=no
+      - name: Prepare unit test summary
+        if: always()
+        run: |
+          python - <<'PY_SUMMARY'
+          import json, os
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          report = Path('test-results/unit.xml')
+          if report.is_file():
+              cases = list(ET.parse(report).getroot().iter('testcase'))
+              summary = {'suite': 'unit', 'revision': os.environ['GITHUB_SHA'], 'tests': len(cases)}
+              summary.update({name: sum(case.find(tag) is not None for case in cases)
+                              for name, tag in [('failures', 'failure'), ('errors', 'error'), ('skipped', 'skipped')]})
+              Path('test-results/unit-summary.json').write_text(json.dumps(summary) + '\n')
+          PY_SUMMARY
+      - name: Retain unit test summary
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: cpu-unit-tests
+          path: test-results/unit-summary.json
+          retention-days: 7
+          if-no-files-found: warn

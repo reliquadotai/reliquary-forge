@@ -33,11 +33,6 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 
-[project.urls]
-Homepage = "https://github.com/reliquadotai/reliquary-forge"
-Repository = "https://github.com/reliquadotai/reliquary-forge"
-Issues = "https://github.com/reliquadotai/reliquary-forge/issues"
-Changelog = "https://github.com/reliquadotai/reliquary-forge/blob/main/CHANGELOG.md"
 dependencies = [
     "typer==0.16.1",
     "rich==14.1.0",
@@ -52,6 +47,12 @@ dependencies = [
     "redis>=5.0.0",
     "psycopg[binary]>=3.2.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/reliquadotai/reliquary-forge"
+Repository = "https://github.com/reliquadotai/reliquary-forge"
+Issues = "https://github.com/reliquadotai/reliquary-forge/issues"
+Changelog = "https://github.com/reliquadotai/reliquary-forge/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 ml = [
@@ -74,6 +75,7 @@ distributed = [
 dev = [
     "pytest>=8.0.0",
     "pytest-xdist>=3.5.0",
+    "httpx>=0.25.0",
     "ruff>=0.12.0",
 ]
 tracing = [

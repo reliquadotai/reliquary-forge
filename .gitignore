@@ -43,3 +43,12 @@ data/
 # Editors
 .idea/
 .vscode/
+
+/test-results/
+
+/.private-research/
+
+/reports/private/
+
+*.private.*
+.coverage.*

@@ -380,3 +380,10 @@ Tests cover SAT generation/evaluation, artifact protocol stability, reasoning-tr
 | [Control Plane](docs/control-plane.md) | FastAPI endpoints, policy publication, promotion flow, Prometheus metrics |
 | [Showcase](docs/showcase.md) | PoC walkthrough, miner archetypes, dashboard output |
 | [Configuration](docs/configuration.md) | All env vars, protocol constants, Docker, Bittensor setup |
+
+### Test reports
+
+CPU CI retains test outcome counts and the source revision for seven days.
+Only the count summary is uploaded; generated XML, captured output and private
+operational material stay outside artifacts and version control. Maintained
+tests and synthetic reference fixtures remain shared in Git.
